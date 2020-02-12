@@ -1,6 +1,8 @@
 # gendash
 Solver and Generator for Boulder Dash/Supaplex style "caves"
 
+In C#, using Dot Net Core 2.1. Coded in VSCode.
+
 The Solver is an implementation of Iterative Deepening A*
 
 The Generator is random for now, based on the frequency of certain characters in a string. This will be changed to a Wave Collapse 
