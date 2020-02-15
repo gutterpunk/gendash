@@ -7,112 +7,110 @@ using System.Linq;
 namespace GenDash {
     class BoardData {
         public ulong Hash { get; set; }
-        public string Data { get; set; }
-        public string Solution { get; set; }
     }
+  
     class Program {
 
-        private static string dnastr = "........********##dd00<";
-        private static int seed = int.MaxValue;
-        private static int minCol = 5;
-        private static int maxCol = 11;
-        private static int minRow = 5;
-        private static int maxRow = 11;
-        private static int maxEmpty = 10;
-        private static int minMove = 15;
-        private static int maxMove = 50;
-        private static int maxSolutionSeconds = 600;
         static void Main(string[] args) {
-
+            int seed = int.MaxValue;
+            int maxNoMove = 10;
+            int minMove = 15;
+            int maxMove = 50;
+            int maxSolutionSeconds = 600;
+            string xmlDatabase = "GenDashDB.xml";
             try {
                 for (int i = 0; i < args.Length; i++) {
-                    if (args[i].Equals("-dna", StringComparison.OrdinalIgnoreCase)) {
-                        dnastr = args[i + 1];
-                        i++;
-                    } else
                     if (args[i].Equals("-seed", StringComparison.OrdinalIgnoreCase)) {
-                        seed = int.Parse(args[i + 1]);
-                        i++;
-                    } else
-                    if (args[i].Equals("-mincol", StringComparison.OrdinalIgnoreCase)) {
-                        minCol = int.Parse(args[i + 1]);
-                        i++;
-                    } else
-                    if (args[i].Equals("-maxcol", StringComparison.OrdinalIgnoreCase)) {
-                        maxCol = int.Parse(args[i + 1]);
-                        i++;
-                    } else
-                    if (args[i].Equals("-minrow", StringComparison.OrdinalIgnoreCase)) {
-                        minRow = int.Parse(args[i + 1]);
-                        i++;
-                    } else
-                    if (args[i].Equals("-maxrow", StringComparison.OrdinalIgnoreCase)) {
-                        maxRow = int.Parse(args[i + 1]);
-                        i++;
+                        seed = int.Parse(args[++i]);
                     } else
                     if (args[i].Equals("-maxempty", StringComparison.OrdinalIgnoreCase)) {
-                        maxEmpty = int.Parse(args[i + 1]);
-                        i++;
+                        maxNoMove = int.Parse(args[++i]);
                     } else
                     if (args[i].Equals("-minmove", StringComparison.OrdinalIgnoreCase)) {
-                        minMove = int.Parse(args[i + 1]);
-                        i++;
+                        minMove = int.Parse(args[++i]);
                     } else
                     if (args[i].Equals("-maxmove", StringComparison.OrdinalIgnoreCase)) {
-                        maxMove = int.Parse(args[i + 1]);
-                        i++;
+                        maxMove = int.Parse(args[++i]);
                     } else
                     if (args[i].Equals("-maxtime", StringComparison.OrdinalIgnoreCase))
                     {
-                        maxSolutionSeconds = int.Parse(args[i + 1]);
-                        i++;
+                        maxSolutionSeconds = int.Parse(args[++i]);
+                    } else
+                    if (args[i].Equals("-xmldatabase", StringComparison.OrdinalIgnoreCase))
+                    {
+                        xmlDatabase = args[++i];
                     }
                 }
             } catch (Exception e) {
                 Console.WriteLine(e.Message);
                 return;
             }
-            List<ElementDetails> newdna = new List<ElementDetails>();
-            char[] chrs = dnastr.ToCharArray();
-            for (int i = 0; i < chrs.Length; i++) {
-                char c = chrs[i];
-                switch (c)
-                {
-                    case '.': newdna.Add(Element.Space); break;
-                    case '*': newdna.Add(Element.Dirt); break;
-                    case '#': newdna.Add(Element.Bricks); break;
-                    case '0': newdna.Add(Element.Boulder); break;
-                    case 'd': newdna.Add(Element.Diamond); break;
-                    case '%': newdna.Add(Element.Steel); break;
-                    case '^': 
-                    case '<': 
-                    case 'v': 
-                    case '>': newdna.Add(Element.Firefly); break;
-                    case 'M':
-                    case 'E':
-                    case 'W':
-                    case '3': newdna.Add(Element.Butterfly); break;
-                }
-            }
-            ElementDetails[] dna = newdna.ToArray();
-                //{ Element.Space, Element.Space, Element.Dirt, Element.Dirt, Element.Space, Element.Space, Element.Dirt, Element.Dirt,
-                //Element.Bricks, Element.Diamond, Element.Boulder };
             if (seed == int.MaxValue) seed = DateTime.Now.Millisecond;
             Random rnd = new Random(seed);
 
-            var filename = "GenDashDB.xml";
             var currentDirectory = Directory.GetCurrentDirectory();
-            var filepath = Path.Combine(currentDirectory, filename);
-            XElement puzzledb = XElement.Load(filepath);
-            IEnumerable<BoardData> records =
-                from puzzle in puzzledb.Descendants("Board")
-                select new BoardData();
-            Console.WriteLine(records.Count());
+            var filepath = Path.Combine(currentDirectory, xmlDatabase);
+            XElement puzzledb;
+            if (File.Exists(filepath)) {
+                puzzledb = XElement.Load(filepath);
+            } else {
+                puzzledb = new XElement("GenDash");                
+            }
+            IEnumerable<XElement> boardsNode = puzzledb.Descendants("Boards"); 
+            List<BoardData> records = (
+                from puzzle in boardsNode.Descendants("Board")
+                select new BoardData() {
+                    Hash = (ulong)puzzle.Element("Hash"),
+                }
+            ).ToList<BoardData>();
+            Console.WriteLine($"Boards loaded from {xmlDatabase} : {records.Count()}");
 
+            IEnumerable<XElement> patternsNode = puzzledb.Descendants("Patterns");
+            List<PatternData> patterns = (
+                from p in patternsNode.Descendants("Pattern")
+                select new PatternData() {
+                    MinWidth = (int)p.Element("MinWidth"),
+                    MinHeight = (int)p.Element("MinHeight"),
+                    MaxWidth = (int)p.Element("MaxWidth"),
+                    MaxHeight = (int)p.Element("MaxHeight"),
+                    Start = new PointFloat() {
+                        X = (float)p.Element("Start").Element("X"),
+                        Y = (float)p.Element("Start").Element("Y"),
+                    },
+                    DNA = (string)p.Element("DNA"),
+                    Commands = (
+                        from c in p.Element("Commands").Elements("Command")                        
+                        select new PatternCommmand {
+                            From = new PointFloat() {
+                                X = (float)c.Element("From").Element("X"),
+                                Y = (float)c.Element("From").Element("Y"),
+                            },
+                            To = new PointFloat() {
+                                X = (float)c.Element("To").Element("X"),
+                                Y = (float)c.Element("To").Element("Y"),
+                            },
+                            Element = Element.CharToElementDetails(char.Parse(c.Element("Element").Value)),
+                            Type = (string)c.Element("Type")
+                        }       
+                    ).ToList<PatternCommmand>()
+                }
+            ).ToList<PatternData>();
+            Console.WriteLine($"Patterns loaded from {xmlDatabase} : {patterns.Count()}");
             do {
                 while (!Console.KeyAvailable) {
-                    Board board = new Board((byte)rnd.Next(minRow, maxRow), (byte)rnd.Next(minCol, maxCol));
+                    PatternData pattern = patterns.ElementAt(rnd.Next(patterns.Count()));
+                    List<ElementDetails> newdna = new List<ElementDetails>();
+                    
+                    char[] chrs = pattern.DNA.ToCharArray();
+                    for (int i = 0; i < chrs.Length; i++) {
+                        char c = chrs[i];
+                        newdna.Add(Element.CharToElementDetails(c));
+                    }
+                    ElementDetails[] dna = newdna.ToArray();
+
+                    Board board = new Board((byte)rnd.Next(pattern.MinWidth, pattern.MaxWidth), (byte)rnd.Next(pattern.MinWidth, pattern.MaxWidth));
                     board.Randomize(rnd, dna);
+                    board.ApplyPattern(pattern);
                     ulong hash = board.FNV1aHash();
                     BoardData existing = records.Where(x => x.Hash == hash).FirstOrDefault();
                     if (existing != null)
@@ -178,13 +176,6 @@ namespace GenDash {
 
                             puzzledb.Save(filepath);
                             Console.WriteLine("Puzzle added to DB");
-
-                            //foreach (Board b in s.Path) {
-                            //    Console.WriteLine("------------");
-                            //    b.Dump();
-                            //    Console.WriteLine(b.NameMove());
-                            //    Thread.Sleep(200);
-                            //}
                         }
                     } else
                         Console.WriteLine($"No solutions found");

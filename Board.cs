@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 
 namespace GenDash {
+   
     public class FoldMovement {
         public FoldMovement(Element element, int fromRow, int fromCol, int toRow, int toCol) {
 
@@ -66,7 +67,49 @@ namespace GenDash {
                     Data[(i * ColCount) + j] = element;
                     
                 }
-            Data[((RowCount / 2) * ColCount) + (ColCount / 2)] = new Element(Element.Player);
+        }
+
+        public void ApplyPattern(PatternData pattern) {
+            int px = (int)Math.Round(pattern.Start.X * ColCount);
+            int py = (int)Math.Round(pattern.Start.Y * RowCount);
+            Place(new Element(Element.Player), py, px);
+
+            foreach (PatternCommmand command in pattern.Commands) {
+                int fx = (int)Math.Round(command.From.X * ColCount);
+                int fy = (int)Math.Round(command.From.Y * RowCount);
+                int tx = (int)Math.Round(command.To.X * ColCount);
+                int ty = (int)Math.Round(command.To.Y * RowCount);
+
+                if (command.Type.ToLower() == "line") {
+                    if (ty - fy < tx - fx) {
+                        float slopex = (ty - fy != 0) ? 1f / (float)(ty - fy) : 0f;
+                        float row = (float)fy;
+                        for (int i = fx; i < tx; i ++) {
+                            Place(new Element(command.Element), (int)Math.Round(row), i);
+                            row += slopex;
+                        }
+                    } else {
+                        float slopey = (tx - fx != 0) ? 1f / (float)(tx - fx) : 0f;
+                        float col = (float)fx;
+                        for (int i = fy; i < ty; i ++) {
+                            Place(new Element(command.Element), i, (int)Math.Round(col));
+                            col += slopey;
+                        }
+                    }
+                } else {
+                    if (command.Type.ToLower() == "rectangle") {
+                        for (int i = fx; i < tx; i ++) {
+                            Place(new Element(command.Element), fy, i);
+                            Place(new Element(command.Element), ty, i);
+                        }
+                        for (int i = fy + 1; i < ty - 1; i ++) {
+                            Place(new Element(command.Element), i, fx);
+                            Place(new Element(command.Element), i, tx);
+                        }
+                      
+                    }
+                }
+            }
         }
         public void FoldSuccessors(List<Board> successors) {
             Board cloned;

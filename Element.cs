@@ -105,6 +105,28 @@ namespace GenDash
             IdCounter++;
             Look = details.StartFacing;
         }
+
+        public static ElementDetails CharToElementDetails(char chr) {
+            switch (chr)
+            {
+                case '.': return Element.Space;
+                case '*': return Element.Dirt;
+                case '#': return Element.Bricks; 
+                case '0': return Element.Boulder;
+                case 'd': return Element.Diamond;
+                case '%': return Element.Steel; 
+                case '^': 
+                case '<': 
+                case 'v': 
+                case '>': return Element.Firefly;
+                case 'M':
+                case 'E':
+                case 'W':
+                case '3': return Element.Butterfly;
+            }
+            return Element.Steel;
+        }
+
         public static bool ExplodeSingle(Board board, int row, int col, ElementDetails nextElement) {
             Element element = board.GetElementAt(row, col);
             if (element == null || element.Details.Indestructible) return false;

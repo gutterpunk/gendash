@@ -2,10 +2,6 @@
 using System.Collections.Generic;
 
 namespace GenDash {
-    class Point {
-        public int X { get; set; }
-        public int Y { get; set; }
-    }
     public class Solution {
         public List<Board> Path { get; set; } = new List<Board>();
         public int Bound { get; set; }
