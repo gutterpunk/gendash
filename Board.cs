@@ -19,6 +19,10 @@ namespace GenDash {
         public Board Head { get; set; }
         public int InputX { get; set; }
         public int InputY { get; set; }
+        public int StartX { get; set; }
+        public int StartY { get; set; }
+        public int ExitX { get; set; }
+        public int ExitY { get; set; }
         public bool Grabbing { get; set; }
         public int LastFoldImportant { get; set; }
         public byte RowCount { get; }
@@ -31,7 +35,6 @@ namespace GenDash {
         public Board(byte width, byte height) {
             RowCount = height;
             ColCount = width;
-
             Data = new Element[RowCount * ColCount];
         }
         public Board(Board clone) {
@@ -46,6 +49,10 @@ namespace GenDash {
                     Data[(i * ColCount) + j] = new Element(e.Details);
                     Data[(i * ColCount) + j].Look = e.Look;
                 }
+            ExitX = clone.ExitX;
+            ExitY = clone.ExitY;
+            StartX = clone.StartX;
+            StartY = clone.StartY;
 
         }
         public string NameMove() {
@@ -59,21 +66,29 @@ namespace GenDash {
             return moveName.ToString();
         }
 
-        public void Randomize(Random rnd, ElementDetails[] dna) {
-            for (int i = 0; i < RowCount; i++)
+        public void Randomize(Random rnd, PatternData pattern, ElementDetails[] dna) {
+            ElementDetails[] nonMobs = Array.FindAll(dna, x => !x.Mob);
+            for (int i = 0; i < RowCount; i++) {
                 for (int j = 0; j < ColCount; j++) {
-                    int pick = rnd.Next(dna.Length);
-                    Element element = new Element(dna[pick]);
-                    Data[(i * ColCount) + j] = element;
-                    
+                    int pick = rnd.Next(nonMobs.Length);
+                    Element element = new Element(nonMobs[pick]);
+                    Data[(i * ColCount) + j] = element;                    
                 }
-        }
-
-        public void ApplyPattern(PatternData pattern) {
-            int px = (int)Math.Round(pattern.Start.X * ColCount);
-            int py = (int)Math.Round(pattern.Start.Y * RowCount);
-            Place(new Element(Element.Player), py, px);
-
+            }
+            ElementDetails[] mobs = Array.FindAll(dna, x => x.Mob);
+            int mobCount = (int)Math.Round((RowCount * ColCount) * pattern.MobRatio);
+            for (int i = 0; i < mobCount; i ++) {
+                int mx, my;
+                do {
+                    mx = rnd.Next(ColCount);
+                    my = rnd.Next(RowCount);
+                    Element under = GetElementAt(my, mx);
+                    if (under != null && !under.Details.Mob) break;
+                } while (true);
+                int pick = rnd.Next(mobs.Length);
+                Element spawn = new Element(mobs[pick]);
+                Place(spawn, my, mx);
+            }
             foreach (PatternCommmand command in pattern.Commands) {
                 int fx = (int)Math.Round(command.From.X * ColCount);
                 int fy = (int)Math.Round(command.From.Y * RowCount);
@@ -110,7 +125,36 @@ namespace GenDash {
                     }
                 }
             }
+
+            int px = rnd.Next(ColCount);
+            int py = rnd.Next(RowCount);
+            if (pattern.Start != null) {
+                px = (int)Math.Round(pattern.Start.X * ColCount);
+                py = (int)Math.Round(pattern.Start.Y * RowCount);
+            }
+            StartX = px;
+            StartY = py;
+            Place(new Element(Element.Steel), py, px);
+            
+            do {
+                px = rnd.Next(ColCount);
+                py = rnd.Next(RowCount);
+                if (pattern.Exit != null) {
+                    px = (int)Math.Round(pattern.Exit.X * ColCount);
+                    py = (int)Math.Round(pattern.Exit.Y * RowCount);
+                }
+                Element under = GetElementAt(py, px);
+                if (under.Details != null && under.Details == Element.Player) {
+                    continue;
+                }
+                ExitX = px;
+                ExitY = py;
+                Place(new Element(Element.Steel), py, px);
+                break;
+            } while (true);
+
         }
+
         public void FoldSuccessors(List<Board> successors) {
             Board cloned;
             for (int i = 0; i < 2; i++) {

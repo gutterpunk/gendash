@@ -1,4 +1,4 @@
- using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -11,7 +11,9 @@ namespace GenDash {
         public int MaxWidth { get; set; }
         public int MinHeight { get; set; }
         public int MaxHeight { get; set; }
+        public float MobRatio { get; set; }
         public PointFloat Start { get; set; }
+        public PointFloat Exit { get; set; }
         public String DNA { get; set; }
         public List<PatternCommmand> Commands { get; set; }
     }  

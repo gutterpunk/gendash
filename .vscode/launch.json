@@ -8,9 +8,12 @@
             "name": ".NET Core Launch (console)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/netcoreapp2.1/win7-x64/GenDash.exe",
-            "args": [],
+            "preLaunchTask": "build Debug",
+            "program": "${workspaceFolder}/bin/Debug/netcoreapp3.1/win7-x64/GenDash.exe",
+            "args": [
+                "-patterns", "patterns.xml",
+                "-seed", "666"
+            ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "console": "externalTerminal"

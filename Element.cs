@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace GenDash
 {
@@ -40,6 +41,7 @@ namespace GenDash
     public class ElementDetails {
         public IDictionary<Direction, char> Symbols { get; set; } = new Dictionary<Direction, char>();
         public bool Important { get; set; } = true;
+        public bool Mob { get; set; } = false;
         public bool Indestructible { get; set; } = false;
 
         public bool Rounded { get; set; } = false;
@@ -64,6 +66,7 @@ namespace GenDash
             },
             StartFacing = DirectionType.Left,
             Important = false,
+            Mob = true,
             Explosion = ExplosionType.ExplodeToDiamond
         };
 
@@ -76,6 +79,7 @@ namespace GenDash
             },
             StartFacing = DirectionType.Up,
             Important = false,
+            Mob = true,
             Explosion = ExplosionType.Explode
         };
 
@@ -212,7 +216,9 @@ namespace GenDash
         }
         private static bool FoldPlayer(Board board, Element element, int row, int col) {
             Element dest = board.GetElementAt(row + board.InputY, col + board.InputX);
-
+            if (row + board.InputY == board.ExitY && col + board.InputX == board.ExitX)
+                if (Array.Find(board.Data, x => x != null && x.Details == Element.Diamond) == null) 
+                    dest = new Element(Element.Space);
             if (dest == null || dest.Details == Space || dest.Details == Dirt || dest.Details == Diamond) {
                 if (board.Grabbing) {
                     board.Place(new Element(Space), row + board.InputY, col + board.InputX);

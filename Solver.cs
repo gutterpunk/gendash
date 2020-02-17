@@ -8,18 +8,23 @@ namespace GenDash {
     }
     public class Solver {
         public bool IsCanceled { get; private set; }
-        private const int FOUND = int.MaxValue;
-        private const int NOT_FOUND = int.MaxValue - 1;
-        private const int CANCELED = int.MaxValue - 2;
-        private const int TIMEDOUT = int.MaxValue - 3;
-        public Solution Solve(Board root, int maxcost = int.MaxValue, DateTime? tryUntil = null, float ratio = 1f) {
+        public const int FOUND = int.MaxValue;
+        public const int NOT_FOUND = int.MaxValue - 1;
+        public const int CANCELED = int.MaxValue - 2;
+        public const int TIMEDOUT = int.MaxValue - 3;
+        public int LastSearchResult { get; private set; }
+        public Solution Solve(Board root, TimeSpan delay, int maxcost = int.MaxValue, float ratio = 1f) {
             Solution solution = new Solution {
                 Path = { root },
                 Bound = Heuristic(root, ratio)
             };
-            Console.Write($"Base Moves: {solution.Bound}");
+            //Console.WriteLine($"Base Moves: {solution.Bound}");
             while (true) {
+                DateTime started = DateTime.Now;
+                DateTime tryUntil =  DateTime.Now.AddSeconds(delay.TotalSeconds);
+                Console.WriteLine($"Searching bounds {solution.Bound} until {tryUntil.ToString("HH:mm:ss")}");
                 int t = Search(solution, 0, tryUntil, ratio);
+                LastSearchResult = t;
                 if (t == FOUND) {
                     Console.WriteLine($". Solution found in {solution.Bound} moves.");
                     return solution;
@@ -41,7 +46,7 @@ namespace GenDash {
                     Console.WriteLine($". Bailing due to maxcost ({maxcost}).");
                     return null;
                 }
-                Console.Write($" -> {t}");
+                Console.WriteLine($"Spent {(DateTime.Now - started).TotalSeconds.ToString("0.##")}s on last bounds. Pushing bounds to {t} moves");
                 solution.Bound = t;
             }
         }
@@ -64,12 +69,13 @@ namespace GenDash {
                     }
                 }
             }
+            int dx, dy;
             while (diamonds.Count > 0) {
                 int m = int.MaxValue;
                 Point closest = null;
                 foreach (Point p in diamonds) {
-                    int dx = Math.Abs(x - p.X);
-                    int dy = Math.Abs(y - p.Y);
+                    dx = Math.Abs(x - p.X);
+                    dy = Math.Abs(y - p.Y);
                     if (dx + dy < m) {
                         closest = p;
                         m = dx + dy;
@@ -82,6 +88,11 @@ namespace GenDash {
                     y = closest.Y;
                 }
             }
+            
+            dx = Math.Abs(x - node.ExitX);
+            dy = Math.Abs(y - node.ExitY);
+            d += (dx + dy);
+            
             return (int)Math.Floor(d * ratio);
         }
         private int Cost(Board from, Board next) {
@@ -92,8 +103,9 @@ namespace GenDash {
 
 
         private int Search(Solution solution, int gcost, DateTime? tryUntil, float ratio = 1f) {
-            if (tryUntil.HasValue)
+            if (tryUntil.HasValue) {
                 if (tryUntil.Value <= DateTime.Now) return TIMEDOUT;
+            }
             if (IsCanceled) return CANCELED;
             Board node = solution.Path[solution.Path.Count - 1];
             int fcost = gcost + Heuristic(node, ratio);
@@ -116,7 +128,20 @@ namespace GenDash {
             return min;
         }
         private bool IsGoal(Board node) {
-            return Array.Find(node.Data, x => x != null && x.Details == Element.Diamond) == null;
+            if (Array.Find(node.Data, x => x != null && x.Details == Element.Diamond) == null) {
+                bool onExit = false;
+                for (int i = 0; i < node.RowCount; i++) {
+                    for (int j = 0; j < node.ColCount; j++) {
+                        Element e = node.Data[(i * node.ColCount) + j];
+                        if (e == null) continue;
+                        if (e.Details == Element.Player) {
+                            if (j == node.ExitX && i == node.ExitY) onExit = true;
+                        }
+                    }
+                }
+                return onExit;
+            }
+            return false;
         }
         private bool BoardOnPath(Board board, List<Board> path) {
             foreach (Board b in path) {
