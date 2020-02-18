@@ -30,11 +30,11 @@
           <Type>Line</Type>
           <From>
             <X>0</X>
-            <Y>0.33</Y>
+            <Y>0.3</Y>
           </From>
           <To>
             <X>0.7</X>
-            <Y>0.33</Y>
+            <Y>0.3</Y>
           </To>
           <Element>#</Element>
         </Command>
@@ -130,11 +130,11 @@
           <Type>Line</Type>
           <From>
             <X>0.2</X>
-            <Y>0.7</Y>
+            <Y>0.6</Y>
           </From>
           <To>
             <X>0.7</X>
-            <Y>0.7</Y>
+            <Y>0.6</Y>
           </To>
           <Element>#</Element>
         </Command>

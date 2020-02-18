@@ -26,24 +26,24 @@ namespace GenDash {
                 int t = Search(solution, 0, tryUntil, ratio);
                 LastSearchResult = t;
                 if (t == FOUND) {
-                    Console.WriteLine($". Solution found in {solution.Bound} moves.");
+                    Console.WriteLine($"Solution found in {solution.Bound} moves.");
                     return solution;
                 }
                 if (t == NOT_FOUND) {
-                    Console.WriteLine($". No solution found in {solution.Bound} moves.");
+                    Console.WriteLine($"No solution found in {solution.Bound} moves.");
                     return null;
                 }
                 if (t == CANCELED) {
-                    Console.WriteLine($". Solver canceled.");
+                    Console.WriteLine($"Solver canceled.");
                     return null;
                 }
                 if (t == TIMEDOUT)
                 {
-                    Console.WriteLine($". Timed out white looking for solution.");
+                    Console.WriteLine($"Timed out white looking for solution.");
                     return null;
                 }
                 if (t >= maxcost) {
-                    Console.WriteLine($". Bailing due to maxcost ({maxcost}).");
+                    Console.WriteLine($"Bailing due to maxcost ({maxcost}).");
                     return null;
                 }
                 Console.WriteLine($"Spent {(DateTime.Now - started).TotalSeconds.ToString("0.##")}s on last bounds. Pushing bounds to {t} moves");
@@ -104,7 +104,8 @@ namespace GenDash {
 
         private int Search(Solution solution, int gcost, DateTime? tryUntil, float ratio = 1f) {
             if (tryUntil.HasValue) {
-                if (tryUntil.Value <= DateTime.Now) return TIMEDOUT;
+                if (tryUntil.Value <= DateTime.Now) 
+                    return TIMEDOUT;
             }
             if (IsCanceled) return CANCELED;
             Board node = solution.Path[solution.Path.Count - 1];
@@ -121,6 +122,9 @@ namespace GenDash {
                     solution.Path.Add(board);
                     int t = Search(solution, gcost + Cost(node, board), tryUntil, ratio);
                     if (t == FOUND) return FOUND;
+                    if (t == TIMEDOUT) 
+                        return TIMEDOUT;
+                    if (t == CANCELED) return CANCELED;
                     if (t < min) min = t;
                     solution.Path.Remove(board);
                 }
