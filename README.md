@@ -5,7 +5,7 @@ In C#, using Dot Net Core 2.1. Coded in VSCode.
 
 The Solver is an implementation of Iterative Deepening A*
 
-The Generator is random for now, based on the frequency of certain characters in a string. This will be changed to a Wave Collapse 
+The Generator is random for now, based on a  pattern file. This might be changed to a wave collapse 
 function once I have enough working caves to based it on.
 
 While the caves generated are compatible with Boulder Dash's mechanics, they are not compatible with the game itself.
