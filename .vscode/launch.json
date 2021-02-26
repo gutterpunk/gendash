@@ -12,7 +12,9 @@
             "program": "${workspaceFolder}/bin/Debug/netcoreapp3.1/win7-x64/GenDash.exe",
             "args": [
                 "-patterns", "patterns.xml",
-                "-seed", "10"
+                "-seed", "1",
+                "-maxmove","75",
+                "-cpu","15"
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

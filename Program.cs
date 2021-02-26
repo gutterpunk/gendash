@@ -3,6 +3,7 @@ using System.IO;
 using System.Xml.Linq;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace GenDash {
     class BoardData {
@@ -21,6 +22,7 @@ namespace GenDash {
             int maxMove = 75;
             int idleFold = 5;
             int maxSolutionSeconds = 600;
+            int cpu = Environment.ProcessorCount - 1;
             string xmlDatabase = "GenDashDB.xml";
             string patternDatabase = null;
             try {
@@ -52,18 +54,21 @@ namespace GenDash {
                     if (args[i].Equals("-patterns", StringComparison.OrdinalIgnoreCase))
                     {
                         patternDatabase = args[++i];
+                    } else
+                    if (args[i].Equals("-cpu", StringComparison.OrdinalIgnoreCase))
+                    {
+                        cpu = int.Parse(args[++i]);
                     }
                 }
             } catch (Exception e) {
                 Console.WriteLine(e.Message);
                 return;
-            }
+            }            
             if (patternDatabase == null) patternDatabase = xmlDatabase;
             if (seed == int.MaxValue) seed = DateTime.Now.Millisecond;
-            Random rnd = new Random(seed);
-
             var currentDirectory = Directory.GetCurrentDirectory();
             var filepath = Path.Combine(currentDirectory, xmlDatabase);
+
             XElement puzzledb;
             if (File.Exists(filepath)) {
                 puzzledb = XElement.Load(filepath);
@@ -84,6 +89,7 @@ namespace GenDash {
                     Hash = (ulong)puzzle.Element("Hash"),
                 }
             ).ToList<RejectData>();
+
             Console.WriteLine($"Boards loaded from {xmlDatabase} : {records.Count()}");
             XElement patternsdb = puzzledb;
             if (xmlDatabase != patternDatabase) {
@@ -129,136 +135,188 @@ namespace GenDash {
                 }
             ).ToList<PatternData>();
             Console.WriteLine($"Patterns loaded from {patternDatabase} : {patterns.Count()}");
+            Random rnd = new Random(seed);
+
+
+            
+            Task[] tasks = new Task[cpu];
             do {
                 while (!Console.KeyAvailable) {
-                    PatternData pattern = patterns.ElementAt(rnd.Next(patterns.Count()));
-                    List<ElementDetails> newdna = new List<ElementDetails>();
-                    
-                    char[] chrs = pattern.DNA.ToCharArray();
-                    for (int i = 0; i < chrs.Length; i++) {
-                        char c = chrs[i];
-                        newdna.Add(Element.CharToElementDetails(c));
-                    }
-                    ElementDetails[] dna = newdna.ToArray();
 
-                    Board board = new Board((byte)rnd.Next(pattern.MinWidth, pattern.MaxWidth), (byte)rnd.Next(pattern.MinHeight, pattern.MaxHeight));
-                    board.Randomize(rnd, pattern, dna);
-                    Board original = new Board(board);
-                    ulong hash = original.FNV1aHash();
-                    BoardData existing = records.Where(x => x.Hash == hash).FirstOrDefault();
-                    if (existing != null)
-                    {
-                        Console.WriteLine($"Board already exists (hash: {hash}).");
-                        continue;
-                    }
-                    RejectData rejected = rejects.Where(x => x.Hash == hash).FirstOrDefault();
-                    if (rejected != null)
-                    {
-                        Console.WriteLine($"Board already rejected (hash: {hash}).");
-                        continue;
-                    }
-
-                    for (int i = 0; i < idleFold; i ++) {
-                        board.Fold();
-                    }
-                    board.Place(new Element(Element.Player), board.StartY, board.StartX);
-
-                    Console.WriteLine("Origin:");
-                    original.Dump();
-                    Console.WriteLine("\nIdle folded:");
-                    board.Dump();
-                    Solver solver = new Solver();
-                    Solution s = solver.Solve(board, new TimeSpan(0, 0, maxSolutionSeconds), maxMove, 1f);
-                    if (s != null && s.Bound < minMove) {
-                        Console.WriteLine($"Move under the minimum ({minMove}), discarding.");
-                        puzzledb.Element("Rejects").Add(
-                            new XElement("Reject",
-                            new XElement("Hash", hash),
-                            new XElement("Reason", "MinMove")
-                        ));
-                        puzzledb.Save(filepath);
-                        s = null;
-                    } else 
-                    if (s == null && solver.LastSearchResult == Solver.TIMEDOUT) {
-                        Console.WriteLine($"Timeout, couldn't verify board. Discarding.");
-                        puzzledb.Element("Rejects").Add(
-                            new XElement("Reject",
-                            new XElement("Hash", hash),
-                            new XElement("Reason", "Timeout"),
-                            new XElement("Data", original.ToString())
-                        ));
-                        puzzledb.Save(filepath);
-                        s = null;
-                    } else
-                    if (s == null) {
-                        Console.WriteLine($"No Solution found. Discarding.");
-                        puzzledb.Element("Rejects").Add(
-                            new XElement("Reject",
-                            new XElement("Hash", hash),
-                            new XElement("Reason", "Unsolveable")
-                        ));
-                        puzzledb.Save(filepath);
-                    }
-
-                    if (s != null) {
-                        Console.WriteLine("Trying to find better solutions.");
-                        float first = s.Bound;
-                        do
-                        {
-                            Solution better = solver.Solve(board, new TimeSpan(0, 0, maxSolutionSeconds), s.Bound, (s.Bound - 1) / first);
-                            if (better != null && better.Bound < s.Bound) {
-                                Console.WriteLine($"Better solution found: {better.Bound}");
-                                s = better;
-                                if (s.Bound < minMove) {
-                                    Console.WriteLine($"Move under the minimum ({minMove}), discarding.");
-                                    s = null;
-                                    break;
-                                }
-                            } else
-                                if (better == null && solver.LastSearchResult == Solver.TIMEDOUT) {
-                                    Console.WriteLine($"Timeout, couldn't verify board. Discarding.");
-                                    puzzledb.Element("Rejects").Add(
-                                        new XElement("Reject",
-                                        new XElement("Hash", hash),
-                                        new XElement("Reason", "timeout"),
-                                        new XElement("Data", original.ToString())
-                                    ));
-                                    puzzledb.Save(filepath);
-                                    s = null;
-                                    break;
-                                } else {
-                                    Console.WriteLine("No better solution, bailing.");
-                                    break;
-                                }
-
-                        } while (true);
-                        if (s != null) {
-                            XElement solution = new XElement("Solution");
-                            int steps = 0;
-                            foreach (Board b in s.Path)
-                            {
-                                solution.Add(new XElement("Move", b.NameMove()));
-                                steps++;
-                            }
-                            puzzledb.Element("Boards").Add(new XElement("Board",
-                                new XElement("Hash", original.FNV1aHash()),
-                                new XElement("Width", original.ColCount),
-                                new XElement("Height", original.RowCount),
-                                new XElement("Par", steps),
-                                new XElement("StartX", original.StartX),
-                                new XElement("StartY", original.StartY),
-                                new XElement("ExitX", original.ExitX),
-                                new XElement("ExitY", original.ExitY),
-                                new XElement("Data", s.Path[0].ToString()),
-                                solution
-                            ));
-
-                            puzzledb.Save(filepath);
-                            Console.WriteLine("Puzzle added to DB");
+                    for (int i = 0; i < cpu; i ++) {
+                        if (tasks[i] == null) {
+                            Console.WriteLine($"New thread, Id {i}");
+                            Worker worker = new Worker();
+                            Task t = Task.Factory.StartNew(() => worker.Work(i, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds));
+                            tasks[i] = t;
                         }
-                    } 
+                    }
+                    try {
+                        Task.WaitAny(tasks);
+                        foreach (Task t in tasks) {
+                            if (t.IsCompleted) {
+                                for (int i = 0; i < cpu; i ++) {
+                                    if (tasks[i] == t) tasks[i] = null;
+                                }
+                            }
+                        }
+
+                    } catch (AggregateException ae) {
+                        Console.WriteLine("One or more exceptions occurred: ");
+                        foreach (var ex in ae.Flatten().InnerExceptions)
+                            Console.WriteLine("   {0}", ex.Message);
+                    }           
                 }
             } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
+        }
+    }
+    class Worker {
+        public void Work(int id, Random rnd, 
+            XElement puzzledb,
+            string filepath,
+            List<BoardData> records,
+            List<PatternData> patterns,
+            List<RejectData> rejects,
+            int maxNoMove,
+            int minMove,
+            int maxMove,
+            int idleFold,
+            int maxSolutionSeconds) {
+
+            List<ElementDetails> newdna = new List<ElementDetails>();
+            PatternData pattern = patterns.ElementAt(rnd.Next(patterns.Count()));
+            char[] chrs = pattern.DNA.ToCharArray();
+            for (int i = 0; i < chrs.Length; i++) {
+                char c = chrs[i];
+                newdna.Add(Element.CharToElementDetails(c));
+            }
+            ElementDetails[] dna = newdna.ToArray();
+
+            Board board = new Board((byte)rnd.Next(pattern.MinWidth, pattern.MaxWidth), (byte)rnd.Next(pattern.MinHeight, pattern.MaxHeight));
+            board.Randomize(rnd, pattern, dna);
+            Board original = new Board(board);
+            ulong hash = original.FNV1aHash();
+            BoardData existing = records.Where(x => x.Hash == hash).FirstOrDefault();
+            if (existing != null)
+            {
+                Console.WriteLine($"(Task {id}) Board already exists (hash: {hash}).");
+                return;
+            }
+            RejectData rejected = rejects.Where(x => x.Hash == hash).FirstOrDefault();
+            if (rejected != null)
+            {
+                Console.WriteLine($"(Task {id}) Board already rejected (hash: {hash}).");
+                return;
+            }
+
+            for (int i = 0; i < idleFold; i ++) {
+                board.Fold();
+            }
+            board.Place(new Element(Element.Player), board.StartY, board.StartX);
+
+            Console.WriteLine($"(Task {id}) Origin:");
+            original.Dump();
+            Console.WriteLine($"\n(Task {id}) Idle folded:");
+            board.Dump();
+            Solver solver = new Solver();
+            Solution s = solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), maxMove, 1f);
+            if (s != null && s.Bound < minMove) {
+                Console.WriteLine($"(Task {id}) Move under the minimum ({minMove}), discarding.");
+                puzzledb.Element("Rejects").Add(
+                    new XElement("Reject",
+                    new XElement("Hash", hash),
+                    new XElement("Reason", "MinMove")
+                ));
+                lock(puzzledb) {
+                    puzzledb.Save(filepath);
+                }
+                s = null;
+            } else 
+            if (s == null && solver.LastSearchResult == Solver.TIMEDOUT) {
+                Console.WriteLine($"(Task {id}) Timeout, couldn't verify board. Discarding.");
+                puzzledb.Element("Rejects").Add(
+                    new XElement("Reject",
+                    new XElement("Hash", hash),
+                    new XElement("Reason", "Timeout"),
+                    new XElement("Data", original.ToString())
+                ));
+                lock(puzzledb) {
+                    puzzledb.Save(filepath);
+                }
+                s = null;
+            } else
+            if (s == null) {
+                Console.WriteLine($"(Task {id}) No Solution found. Discarding.");
+                puzzledb.Element("Rejects").Add(
+                    new XElement("Reject",
+                    new XElement("Hash", hash),
+                    new XElement("Reason", "Unsolveable")
+                ));
+                lock(puzzledb) {
+                    puzzledb.Save(filepath);
+                }
+            }
+
+            if (s != null) {
+                Console.WriteLine($"(Task {id}) Trying to find better solutions.");
+                float first = s.Bound;
+                do
+                {
+                    Solution better = solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), s.Bound, (s.Bound - 1) / first);
+                    if (better != null && better.Bound < s.Bound) {
+                        Console.WriteLine($"(Task {id}) Better solution found: {better.Bound}");
+                        s = better;
+                        if (s.Bound < minMove) {
+                            Console.WriteLine($"(Task {id}) Move under the minimum ({minMove}), discarding.");
+                            s = null;
+                            break;
+                        }
+                    } else
+                        if (better == null && solver.LastSearchResult == Solver.TIMEDOUT) {
+                            Console.WriteLine($"(Task {id}) Timeout, couldn't verify board. Discarding.");
+                            puzzledb.Element("Rejects").Add(
+                                new XElement("Reject",
+                                new XElement("Hash", hash),
+                                new XElement("Reason", "timeout"),
+                                new XElement("Data", original.ToString())
+                            ));
+                            lock(puzzledb) {
+                                puzzledb.Save(filepath);
+                            }
+                            s = null;
+                            break;
+                        } else {
+                            Console.WriteLine($"(Task {id}) No better solution, bailing.");
+                            break;
+                        }
+
+                } while (true);
+                if (s != null) {
+                    XElement solution = new XElement("Solution");
+                    int steps = 0;
+                    foreach (Board b in s.Path)
+                    {
+                        solution.Add(new XElement("Move", b.NameMove()));
+                        steps++;
+                    }
+                    puzzledb.Element("Boards").Add(new XElement("Board",
+                        new XElement("Hash", original.FNV1aHash()),
+                        new XElement("Width", original.ColCount),
+                        new XElement("Height", original.RowCount),
+                        new XElement("Par", steps),
+                        new XElement("StartX", original.StartX),
+                        new XElement("StartY", original.StartY),
+                        new XElement("ExitX", original.ExitX),
+                        new XElement("ExitY", original.ExitY),
+                        new XElement("Data", s.Path[0].ToString()),
+                        solution
+                    ));
+                    lock(puzzledb) {
+                        puzzledb.Save(filepath);
+                    }
+                    Console.WriteLine($"(Task {id}) Puzzle added to DB");
+                }
+            } 
         }
 
     }

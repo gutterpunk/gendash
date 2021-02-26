@@ -13,7 +13,7 @@ namespace GenDash {
         public const int CANCELED = int.MaxValue - 2;
         public const int TIMEDOUT = int.MaxValue - 3;
         public int LastSearchResult { get; private set; }
-        public Solution Solve(Board root, TimeSpan delay, int maxcost = int.MaxValue, float ratio = 1f) {
+        public Solution Solve(int Id, Board root, TimeSpan delay, int maxcost = int.MaxValue, float ratio = 1f) {
             Solution solution = new Solution {
                 Path = { root },
                 Bound = Heuristic(root, ratio)
@@ -22,31 +22,31 @@ namespace GenDash {
             while (true) {
                 DateTime started = DateTime.Now;
                 DateTime tryUntil =  DateTime.Now.AddSeconds(delay.TotalSeconds);
-                Console.WriteLine($"Searching bounds {solution.Bound} until {tryUntil.ToString("HH:mm:ss")}");
+                Console.WriteLine($"(Task {Id}) Searching bounds {solution.Bound} until {tryUntil.ToString("HH:mm:ss")}");
                 int t = Search(solution, 0, tryUntil, ratio);
                 LastSearchResult = t;
                 if (t == FOUND) {
-                    Console.WriteLine($"Solution found in {solution.Bound} moves.");
+                    Console.WriteLine($"(Task {Id}) Solution found in {solution.Bound} moves.");
                     return solution;
                 }
                 if (t == NOT_FOUND) {
-                    Console.WriteLine($"No solution found in {solution.Bound} moves.");
+                    Console.WriteLine($"(Task {Id}) No solution found in {solution.Bound} moves.");
                     return null;
                 }
                 if (t == CANCELED) {
-                    Console.WriteLine($"Solver canceled.");
+                    Console.WriteLine($"(Task {Id}) Solver canceled.");
                     return null;
                 }
                 if (t == TIMEDOUT)
                 {
-                    Console.WriteLine($"Timed out white looking for solution.");
+                    Console.WriteLine($"(Task {Id}) Timed out white looking for solution.");
                     return null;
                 }
                 if (t >= maxcost) {
-                    Console.WriteLine($"Bailing due to maxcost ({maxcost}).");
+                    Console.WriteLine($"(Task {Id}) Bailing due to maxcost ({maxcost}).");
                     return null;
                 }
-                Console.WriteLine($"Spent {(DateTime.Now - started).TotalSeconds.ToString("0.##")}s on last bounds. Pushing bounds to {t} moves");
+                Console.WriteLine($"(Task {Id}) Spent {(DateTime.Now - started).TotalSeconds.ToString("0.##")}s on last bounds. Pushing bounds to {t} moves");
                 solution.Bound = t;
             }
         }
