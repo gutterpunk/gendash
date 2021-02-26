@@ -3,6 +3,7 @@ using System.IO;
 using System.Xml.Linq;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace GenDash {
@@ -138,14 +139,14 @@ namespace GenDash {
             Random rnd = new Random(seed);
             int id = 1;
             Task[] tasks = new Task[cpu];
-            do {
-                while (!Console.KeyAvailable) {
-
+            using (CancellationTokenSource source = new CancellationTokenSource()) {
+                do {
                     for (int i = 0; i < cpu; i ++) {
                         if (tasks[i] == null) {
                             Console.WriteLine($"New thread, Id {id}");
                             Worker worker = new Worker();
-                            Task t = Task.Factory.StartNew(() => worker.Work(id, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds));
+                            Task t = Task.Factory.StartNew(() => worker.Work(id, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds),
+                                source.Token);
                             tasks[i] = t;
                             id++;
                         }
@@ -155,7 +156,9 @@ namespace GenDash {
                         foreach (Task t in tasks) {
                             if (t.IsCompleted) {
                                 for (int i = 0; i < cpu; i ++) {
-                                    if (tasks[i] == t) tasks[i] = null;
+                                    if (tasks[i] == t) {
+                                        tasks[i] = null;
+                                    }
                                 }
                             }
                         }
@@ -165,8 +168,9 @@ namespace GenDash {
                         foreach (var ex in ae.Flatten().InnerExceptions)
                             Console.WriteLine("   {0}", ex.Message);
                     }           
-                }
-            } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
+                } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
+                source.Cancel();
+            }
         }
     }
     class Worker {
@@ -241,7 +245,7 @@ namespace GenDash {
                 puzzledb.Element("Rejects").Add(
                     new XElement("Reject",
                     new XElement("Hash", hash),
-                    new XElement("Reason", "Timeout"),
+                    new XElement("Reason", "Timeout with no solution"),
                     new XElement("Data", original.ToString())
                 ));
                 lock(puzzledb) {
@@ -291,12 +295,23 @@ namespace GenDash {
                             puzzledb.Element("Rejects").Add(
                                 new XElement("Reject",
                                 new XElement("Hash", hash),
-                                new XElement("Reason", "timeout"),
+                                new XElement("Width", original.ColCount),
+                                new XElement("Height", original.RowCount),
+                                new XElement("StartX", original.StartX),
+                                new XElement("StartY", original.StartY),
+                                new XElement("ExitX", original.ExitX),
+                                new XElement("ExitY", original.ExitY),
+                                new XElement("Reason", "Timeout while looking for a better solution"),
                                 new XElement("Data", original.ToString())
                             ));
                             lock(puzzledb) {
                                 puzzledb.Save(filepath);
                             }
+                            lock(rejects) {
+                                rejects.Add(new RejectData{ 
+                                    Hash = hash
+                                });
+                            }                            
                             s = null;
                             break;
                         } else {

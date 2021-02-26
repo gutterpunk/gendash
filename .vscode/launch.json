@@ -14,7 +14,8 @@
                 "-patterns", "patterns.xml",
                 "-seed", "1",
                 "-maxmove","75",
-                "-cpu","15"
+                "-cpu","12",
+                "-maxtime", "1200"
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
