@@ -141,33 +141,36 @@ namespace GenDash {
             Task[] tasks = new Task[cpu];
             using (CancellationTokenSource source = new CancellationTokenSource()) {
                 do {
-                    for (int i = 0; i < cpu; i ++) {
-                        if (tasks[i] == null) {
-                            Console.WriteLine($"New thread, Id {id}");
-                            Worker worker = new Worker();
-                            Task t = Task.Factory.StartNew(() => worker.Work(id, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds),
-                                source.Token);
-                            tasks[i] = t;
-                            id++;
+                    while (!Console.KeyAvailable) {
+
+                        for (int i = 0; i < cpu; i ++) {
+                            if (tasks[i] == null) {
+                                Console.WriteLine($"New thread, Id {id}");
+                                Worker worker = new Worker();
+                                Task t = Task.Factory.StartNew(() => worker.Work(id, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds),
+                                    source.Token);
+                                tasks[i] = t;
+                                id++;
+                            }
                         }
-                    }
-                    try {
-                        Task.WaitAny(tasks);
-                        foreach (Task t in tasks) {
-                            if (t.IsCompleted) {
-                                for (int i = 0; i < cpu; i ++) {
-                                    if (tasks[i] == t) {
-                                        tasks[i] = null;
+                        try {
+                            Task.WaitAny(tasks);
+                            foreach (Task t in tasks) {
+                                if (t.IsCompleted) {
+                                    for (int i = 0; i < cpu; i ++) {
+                                        if (tasks[i] == t) {
+                                            tasks[i] = null;
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                    } catch (AggregateException ae) {
-                        Console.WriteLine("One or more exceptions occurred: ");
-                        foreach (var ex in ae.Flatten().InnerExceptions)
-                            Console.WriteLine("   {0}", ex.Message);
-                    }           
+                        } catch (AggregateException ae) {
+                            Console.WriteLine("One or more exceptions occurred: ");
+                            foreach (var ex in ae.Flatten().InnerExceptions)
+                                Console.WriteLine("   {0}", ex.Message);
+                        }           
+                    }
                 } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
                 source.Cancel();
             }
