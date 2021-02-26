@@ -136,19 +136,18 @@ namespace GenDash {
             ).ToList<PatternData>();
             Console.WriteLine($"Patterns loaded from {patternDatabase} : {patterns.Count()}");
             Random rnd = new Random(seed);
-
-
-            
+            int id = 1;
             Task[] tasks = new Task[cpu];
             do {
                 while (!Console.KeyAvailable) {
 
                     for (int i = 0; i < cpu; i ++) {
                         if (tasks[i] == null) {
-                            Console.WriteLine($"New thread, Id {i}");
+                            Console.WriteLine($"New thread, Id {id}");
                             Worker worker = new Worker();
-                            Task t = Task.Factory.StartNew(() => worker.Work(i, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds));
+                            Task t = Task.Factory.StartNew(() => worker.Work(id, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds));
                             tasks[i] = t;
+                            id++;
                         }
                     }
                     try {
@@ -230,6 +229,11 @@ namespace GenDash {
                 lock(puzzledb) {
                     puzzledb.Save(filepath);
                 }
+                lock(rejects) {
+                    rejects.Add(new RejectData{ 
+                        Hash = hash
+                    });
+                }
                 s = null;
             } else 
             if (s == null && solver.LastSearchResult == Solver.TIMEDOUT) {
@@ -243,6 +247,11 @@ namespace GenDash {
                 lock(puzzledb) {
                     puzzledb.Save(filepath);
                 }
+                lock(rejects) {
+                    rejects.Add(new RejectData{ 
+                        Hash = hash
+                    });
+                }
                 s = null;
             } else
             if (s == null) {
@@ -254,6 +263,11 @@ namespace GenDash {
                 ));
                 lock(puzzledb) {
                     puzzledb.Save(filepath);
+                }
+                lock(rejects) {
+                    rejects.Add(new RejectData{ 
+                        Hash = hash
+                    });
                 }
             }
 
@@ -313,6 +327,11 @@ namespace GenDash {
                     ));
                     lock(puzzledb) {
                         puzzledb.Save(filepath);
+                    }
+                    lock(records) {
+                        records.Add(new BoardData {
+                            Hash = hash
+                        });
                     }
                     Console.WriteLine($"(Task {id}) Puzzle added to DB");
                 }
