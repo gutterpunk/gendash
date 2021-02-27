@@ -7,11 +7,12 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace GenDash {
-    class Move {
-        public string Name { get; set; }
+    class Fold {
+        public string Move { get; set; }
+        public string Data { get; set; }
     }
     class BoardSolution : Board {
-        public List<Move> Solution { get; set; }
+        public List<Fold> Solution { get; set; }
         public int IdleFold { get; set; }
         public BoardSolution(byte width, byte height, string data) 
             :base(width, height, data) {
@@ -114,29 +115,36 @@ namespace GenDash {
                         ExitX = (int)puzzle.Element("ExitX"),
                         ExitY = (int)puzzle.Element("ExitX"),
                         IdleFold = (int)puzzle.Element("Idle"),
-                        Solution = puzzle.Element("Solution").Elements("Move")
-                            .Select(p => new Move {
-                                Name = (string)p.Value                                
+                        Solution = puzzle.Element("Solution").Elements("Fold")
+                            .Select(p => new Fold {
+                                Move = (string)p.Attribute("Move"),
+                                Data = p.Value                                
                             })
                             .ToList()
                     }).FirstOrDefault();
                     if (pbd != null) {
                     for (int i = 0; i < pbd.IdleFold; i ++) {
+                        pbd.Fold();
                         Console.Clear();
                         pbd.Dump();
-                        Thread.Sleep(playbackSpeed / 4);
-                        pbd.Fold();
+                        Console.WriteLine();
+                        Console.WriteLine($"Idle {pbd.IdleFold - i}");
+                        Thread.Sleep(playbackSpeed);
                     }
                     pbd.Place(new Element(Element.Player), pbd.StartY, pbd.StartX);
                     pbd.Solution.Remove(pbd.Solution.First());
                     foreach (var s in pbd.Solution) {
+                        pbd.SetMove(s.Move);
+                        pbd.Fold();
                         Console.Clear();
                         pbd.Dump();
                         Console.WriteLine();
-                        Console.WriteLine(s.Name);
+                        for (int i = 0; i < s.Data.Length; i += pbd.ColCount) {
+                            Console.WriteLine(s.Data.Substring(i, pbd.ColCount));
+                        }
+                        Console.WriteLine();
+                        Console.WriteLine(s.Move);
                         Thread.Sleep(playbackSpeed);
-                        pbd.SetMove(s.Name);
-                        pbd.Fold();
                     }
                 }
                 return;
@@ -387,7 +395,9 @@ namespace GenDash {
                     int steps = 0;
                     foreach (Board b in s.Path)
                     {
-                        solution.Add(new XElement("Move", b.NameMove()));
+                        var fold = new XElement("Fold", b.ToString());
+                        fold.SetAttributeValue("Move", b.NameMove());
+                        solution.Add(fold);
                         steps++;
                     }
                     puzzledb.Element("Boards").Add(new XElement("Board",

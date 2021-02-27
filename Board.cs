@@ -62,6 +62,7 @@ namespace GenDash {
                     if (e == null) continue;
                     Data[(i * ColCount) + j] = new Element(e.Details);
                     Data[(i * ColCount) + j].Look = e.Look;
+                    Data[(i * ColCount) + j].Falling = e.Falling;
                 }
             ExitX = clone.ExitX;
             ExitY = clone.ExitY;
@@ -291,7 +292,11 @@ namespace GenDash {
                         b.Append(Element.Space.Symbols[DirectionType.Undefined]);
                         continue;
                     }
-                    b.Append(d.Details.Symbols[d.Look]);
+                    //if (d.Details == Element.Diamond && d.Falling) { //DEBUG
+                    //    b.Append('+');
+                    //}
+                    //else
+                        b.Append(d.Details.Symbols[d.Look]);
                 }
                 if (!singleLine) b.Append(Environment.NewLine);
             }
