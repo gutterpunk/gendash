@@ -7,6 +7,16 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace GenDash {
+    class Move {
+        public string Name { get; set; }
+    }
+    class BoardSolution : Board {
+        public List<Move> Solution { get; set; }
+        public int IdleFold { get; set; }
+        public BoardSolution(byte width, byte height, string data) 
+            :base(width, height, data) {
+        }        
+    }
     class BoardData {
         public ulong Hash { get; set; }
     }
@@ -21,11 +31,13 @@ namespace GenDash {
             int maxNoMove = 10;
             int minMove = 15;
             int maxMove = 75;
-            int idleFold = 5;
+            int idleFold = 5; //NEVER CHANGE THAT!
             int maxSolutionSeconds = 600;
             int cpu = Environment.ProcessorCount - 1;
             string xmlDatabase = "GenDashDB.xml";
             string patternDatabase = null;
+            ulong playback = 0;
+            int playbackSpeed = 200;
             try {
                 for (int i = 0; i < args.Length; i++) {
                     if (args[i].Equals("-seed", StringComparison.OrdinalIgnoreCase)) {
@@ -59,6 +71,14 @@ namespace GenDash {
                     if (args[i].Equals("-cpu", StringComparison.OrdinalIgnoreCase))
                     {
                         cpu = int.Parse(args[++i]);
+                    } else
+                    if (args[i].Equals("-playback", StringComparison.OrdinalIgnoreCase))
+                    {
+                        playback = ulong.Parse(args[++i]);
+                    } else
+                    if (args[i].Equals("-playspeed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        playbackSpeed = int.Parse(args[++i]);
                     }
                 }
             } catch (Exception e) {
@@ -83,6 +103,44 @@ namespace GenDash {
                     Hash = (ulong)puzzle.Element("Hash"),
                 }
             ).ToList<BoardData>();
+
+            if (playback > 0) {
+                var pbd = (
+                    from puzzle in boardsNode.Descendants("Board")
+                    where (ulong)puzzle.Element("Hash") == playback
+                    select new BoardSolution((byte)(int)puzzle.Element("Width"), (byte)(int)puzzle.Element("Height"), (string)puzzle.Element("Data")) {
+                        StartX = (int)puzzle.Element("StartX"),
+                        StartY = (int)puzzle.Element("StartY"),
+                        ExitX = (int)puzzle.Element("ExitX"),
+                        ExitY = (int)puzzle.Element("ExitX"),
+                        IdleFold = (int)puzzle.Element("Idle"),
+                        Solution = puzzle.Element("Solution").Elements("Move")
+                            .Select(p => new Move {
+                                Name = (string)p.Value                                
+                            })
+                            .ToList()
+                    }).FirstOrDefault();
+                    if (pbd != null) {
+                    for (int i = 0; i < pbd.IdleFold; i ++) {
+                        Console.Clear();
+                        pbd.Dump();
+                        Thread.Sleep(playbackSpeed / 4);
+                        pbd.Fold();
+                    }
+                    pbd.Place(new Element(Element.Player), pbd.StartY, pbd.StartX);
+                    pbd.Solution.Remove(pbd.Solution.First());
+                    foreach (var s in pbd.Solution) {
+                        Console.Clear();
+                        pbd.Dump();
+                        Console.WriteLine();
+                        Console.WriteLine(s.Name);
+                        Thread.Sleep(playbackSpeed);
+                        pbd.SetMove(s.Name);
+                        pbd.Fold();
+                    }
+                }
+                return;
+            }
 
             List<RejectData> rejects = (
                 from puzzle in puzzledb.Descendants("Rejects").Descendants("Reject")
@@ -305,6 +363,7 @@ namespace GenDash {
                                 new XElement("ExitX", original.ExitX),
                                 new XElement("ExitY", original.ExitY),
                                 new XElement("Reason", "Timeout while looking for a better solution"),
+                                new XElement("Idle", idleFold),
                                 new XElement("Data", original.ToString())
                             ));
                             lock(puzzledb) {
@@ -340,7 +399,8 @@ namespace GenDash {
                         new XElement("StartY", original.StartY),
                         new XElement("ExitX", original.ExitX),
                         new XElement("ExitY", original.ExitY),
-                        new XElement("Data", s.Path[0].ToString()),
+                        new XElement("Idle", idleFold),
+                        new XElement("Data", original.ToString()),
                         solution
                     ));
                     lock(puzzledb) {

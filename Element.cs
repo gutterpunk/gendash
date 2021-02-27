@@ -83,17 +83,17 @@ namespace GenDash
             Explosion = ExplosionType.Explode
         };
 
-        public static ElementDetails Explosion0 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'a' } } };
-        public static ElementDetails Explosion1 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'b' } } };
-        public static ElementDetails Explosion2 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'c' } } };
-        public static ElementDetails Explosion3 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'd' } } };
-        public static ElementDetails Explosion4 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'e' } } };
+        public static ElementDetails Explosion0 = new ElementDetails { Symbols = { { DirectionType.Undefined, '5' } } };
+        public static ElementDetails Explosion1 = new ElementDetails { Symbols = { { DirectionType.Undefined, '6' } } };
+        public static ElementDetails Explosion2 = new ElementDetails { Symbols = { { DirectionType.Undefined, '7' } } };
+        public static ElementDetails Explosion3 = new ElementDetails { Symbols = { { DirectionType.Undefined, '8' } } };
+        public static ElementDetails Explosion4 = new ElementDetails { Symbols = { { DirectionType.Undefined, '9' } } };
 
-        public static ElementDetails ExplosionToDiamond0 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'A' } } };
-        public static ElementDetails ExplosionToDiamond1 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'B' } } };
-        public static ElementDetails ExplosionToDiamond2 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'C' } } };
-        public static ElementDetails ExplosionToDiamond3 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'D' } } };
-        public static ElementDetails ExplosionToDiamond4 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'E' } } };
+        public static ElementDetails ExplosionToDiamond0 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'Y' } } };
+        public static ElementDetails ExplosionToDiamond1 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'U' } } };
+        public static ElementDetails ExplosionToDiamond2 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'I' } } };
+        public static ElementDetails ExplosionToDiamond3 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'P' } } };
+        public static ElementDetails ExplosionToDiamond4 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'T' } } };
 
         private static int IdCounter;
         public int Id { get; }
@@ -109,7 +109,12 @@ namespace GenDash
             IdCounter++;
             Look = details.StartFacing;
         }
-
+        public Element(ElementDetails details, Direction direction) {
+            Id = IdCounter;
+            Details = details;
+            IdCounter++;
+            Look = direction;
+        }
         public static ElementDetails CharToElementDetails(char chr) {
             switch (chr)
             {
@@ -127,8 +132,33 @@ namespace GenDash
                 case 'E':
                 case 'W':
                 case '3': return Element.Butterfly;
+                case '5': return Element.Explosion0;
+                case '6': return Element.Explosion1;
+                case '7': return Element.Explosion2;
+                case '8': return Element.Explosion3;
+                case '9': return Element.Explosion4;
+                case 'Y': return Element.ExplosionToDiamond0;
+                case 'U': return Element.ExplosionToDiamond1;
+                case 'I': return Element.ExplosionToDiamond2;
+                case 'P': return Element.ExplosionToDiamond3;
+                case 'T': return Element.ExplosionToDiamond4;
             }
             return Element.Steel;
+        }
+        public static Direction CharToFacing(char chr) {
+            switch (chr)
+            {
+                case '^': return DirectionType.Up;
+                case '<': return DirectionType.Left;
+                case 'v': return DirectionType.Down; 
+                case '>': return DirectionType.Right;
+                case 'M': return DirectionType.Up;
+                case 'E': return DirectionType.Left;
+                case 'W': return DirectionType.Down;
+                case '3': return DirectionType.Right;
+                default:
+                    return DirectionType.Undefined;
+            }
         }
 
         public static bool ExplodeSingle(Board board, int row, int col, ElementDetails nextElement) {

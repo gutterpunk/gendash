@@ -102,7 +102,6 @@ namespace GenDash {
             return 10000;
         }
 
-
         private int Search(Solution solution, int gcost, DateTime? tryUntil, float ratio = 1f) {
             if (tryUntil.HasValue) {
                 if (tryUntil.Value <= DateTime.Now) 

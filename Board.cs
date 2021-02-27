@@ -37,8 +37,22 @@ namespace GenDash {
             ColCount = width;
             Data = new Element[RowCount * ColCount];
         }
+        public Board(byte width, byte height, string data) {
+            RowCount = height;
+            ColCount = width;
+            Data = new Element[RowCount * ColCount];
+            char[] carray = data.ToCharArray();
+            for (int i = 0; i < RowCount; i++)
+                for (int j = 0; j < ColCount; j++) {
+                    ElementDetails details = Element.CharToElementDetails(carray[(i * ColCount) + j]);
+                    Direction dir = Element.CharToFacing(carray[(i * ColCount) + j]);
+                    Element e = new Element(details, dir);
+                    if (e == null) continue;
+                    Data[(i * ColCount) + j] = new Element(e.Details);
+                    Data[(i * ColCount) + j].Look = e.Look;
+                }            
+        }
         public Board(Board clone) {
-
             RowCount = clone.RowCount;
             ColCount = clone.ColCount;
             Data = new Element[RowCount * ColCount];
@@ -53,7 +67,6 @@ namespace GenDash {
             ExitY = clone.ExitY;
             StartX = clone.StartX;
             StartY = clone.StartY;
-
         }
         public string NameMove() {
             StringBuilder moveName = new StringBuilder();
@@ -65,7 +78,22 @@ namespace GenDash {
             if (InputX == 0 && InputY == 0) moveName.Append("Stationary");
             return moveName.ToString();
         }
-
+        public void SetMove(string move) {
+            Grabbing = false;
+            if (move.StartsWith("grab", StringComparison.OrdinalIgnoreCase)) {
+                Grabbing = true;
+                move = move.Substring(4);
+            }
+            move = move.ToLowerInvariant();
+            InputX = 0;
+            InputY = 0;
+            switch (move) {
+                case "left": InputX = -1; break;
+                case "right": InputX = 1; break;
+                case "up": InputY = -1; break;
+                case "down": InputY = 1; break;
+            }
+        }
         public void Randomize(Random rnd, PatternData pattern, ElementDetails[] dna) {
             ElementDetails[] nonMobs = Array.FindAll(dna, x => !x.Mob);
             for (int i = 0; i < RowCount; i++) {
@@ -255,17 +283,20 @@ namespace GenDash {
 
 
         public void Dump(bool singleLine = false) {
+            StringBuilder b = new StringBuilder();
             for (int i = 0; i < RowCount; i++) {
                 for (int j = 0; j < ColCount; j++) {
                     Element d = Data[(i * ColCount) + j];
                     if (d == null) {
-                        Console.Write(Element.Space.Symbols[DirectionType.Undefined]);
+                        b.Append(Element.Space.Symbols[DirectionType.Undefined]);
                         continue;
                     }
-                    Console.Write(d.Details.Symbols[d.Look]);
+                    b.Append(d.Details.Symbols[d.Look]);
                 }
-                if (!singleLine) Console.WriteLine();
+                if (!singleLine) b.Append(Environment.NewLine);
             }
+            Console.WriteLine(b.ToString());
+    
         }
         public override string ToString() {
             StringBuilder b = new StringBuilder();
