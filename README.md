@@ -32,7 +32,17 @@ Implemented so far:
 
 Magic walls are next, as they work well in a puzzle. Custom, non-BD related blocks are also planned.
 
-TODO: Usage. Check Program.cs in the meantime for command line switches.
+Usage:
+-patterns       Room patterns file
+-playback       Hash of a cave in the database to display
+-playspeed      Playback speed
+-seed           Seed that controls the generationof the cave's seeds
+-minmove        Minimum moves to accept
+-maxmove        Maximum moves to accept
+-cpu            Number of Threads to start
+-maxtime        Maximum time spent looking for a solution, in seconds
+-maxempty       Maximum number of folds spent without the player moving
+-idle           Number of folds to skip at the cave's opening
 
 Remarks:
 
