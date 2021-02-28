@@ -2,17 +2,25 @@
 <GenDash>
   <Patterns>
     <Pattern>
-      <MinWidth>6</MinWidth>
+      <MinWidth>7</MinWidth>
       <MinHeight>6</MinHeight>
-      <MaxWidth>12</MaxWidth>
-      <MaxHeight>12</MaxHeight>
+      <MaxWidth>15</MaxWidth>
+      <MaxHeight>13</MaxHeight>
+      <MobRatio>0.0</MobRatio>      
+      <DNA>...******#d00...******#dd00&lt;M</DNA>
+      <Commands></Commands>
+    </Pattern>    <Pattern>
+      <MinWidth>7</MinWidth>
+      <MinHeight>6</MinHeight>
+      <MaxWidth>15</MaxWidth>
+      <MaxHeight>13</MaxHeight>
       <MobRatio>0.035</MobRatio>      
       <DNA>......****#d00......****#dd00&lt;M</DNA>
       <Commands></Commands>
     </Pattern>
     <Pattern>
       <MinWidth>7</MinWidth>
-      <MinHeight>11</MinHeight>
+      <MinHeight>5</MinHeight>
       <MaxWidth>13</MaxWidth>
       <MaxHeight>11</MaxHeight>
       <MobRatio>0.02</MobRatio>      
@@ -53,10 +61,10 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>9</MinWidth>
-      <MinHeight>9</MinHeight>
-      <MaxWidth>11</MaxWidth>
-      <MaxHeight>11</MaxHeight>
+      <MinWidth>8</MinWidth>
+      <MinHeight>8</MinHeight>
+      <MaxWidth>14</MaxWidth>
+      <MaxHeight>14</MaxHeight>
       <MobRatio>0.02</MobRatio>
       <DNA>....******d00&lt;M</DNA>
       <Start>
@@ -107,10 +115,10 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>7</MinWidth>
-      <MinHeight>7</MinHeight>
-      <MaxWidth>12</MaxWidth>
-      <MaxHeight>12</MaxHeight>
+      <MinWidth>8</MinWidth>
+      <MinHeight>8</MinHeight>
+      <MaxWidth>14</MaxWidth>
+      <MaxHeight>14</MaxHeight>
       <MobRatio>0.02</MobRatio>
       <DNA>....******0d&lt;M</DNA>
       <Commands>
@@ -142,8 +150,8 @@
     </Pattern>
     <Pattern>
       <MinWidth>7</MinWidth>
-      <MinHeight>7</MinHeight>
-      <MaxWidth>12</MaxWidth>
+      <MinHeight>5</MinHeight>
+      <MaxWidth>15</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.02</MobRatio>
       <DNA>....******0d&lt;M</DNA>

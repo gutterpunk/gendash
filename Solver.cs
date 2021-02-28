@@ -13,41 +13,42 @@ namespace GenDash {
         public const int CANCELED = int.MaxValue - 2;
         public const int TIMEDOUT = int.MaxValue - 3;
         public int LastSearchResult { get; private set; }
+        public DateTime LastSearch { get; private set; }
+        public DateTime Timeout { get; private set; }
         public Solution Solve(int Id, Board root, TimeSpan delay, int maxcost = int.MaxValue, float ratio = 1f) {
             Solution solution = new Solution {
                 Path = { root },
                 Bound = Heuristic(root, ratio)
             };
-            //Console.WriteLine($"Base Moves: {solution.Bound}");
             while (true) {
-                DateTime started = DateTime.Now;
-                DateTime tryUntil =  DateTime.Now.AddSeconds(delay.TotalSeconds);
-                Console.WriteLine($"(Task {Id}) Searching bounds {solution.Bound} until {tryUntil.ToString("HH:mm:ss")}");
-                int t = Search(solution, 0, tryUntil, ratio);
+                LastSearch = DateTime.Now;
+                Timeout =  DateTime.Now.AddSeconds(delay.TotalSeconds);
+                //Console.WriteLine($"(Task {Id}) Searching bounds {solution.Bound} until {tryUntil.ToString("HH:mm:ss")}");
+                int t = Search(solution, 0, Timeout, ratio);
                 LastSearchResult = t;
-                Console.WriteLine($"(Task {Id}) Spent {(DateTime.Now - started).TotalSeconds.ToString("0.##")}s on last bounds.");
+                //Console.WriteLine($"(Task {Id}) Spent {(DateTime.Now - started).TotalSeconds.ToString("0.##")}s on last bounds.");
                 if (t == FOUND) {
-                    Console.WriteLine($"    Solution found in {solution.Bound} moves.");
+                    //Console.WriteLine($"    Solution found in {solution.Bound} moves.");
                     return solution;
                 }
                 if (t == NOT_FOUND) {
-                    Console.WriteLine($"    No solution found in {solution.Bound} moves.");
+                    //Console.WriteLine($"    No solution found in {solution.Bound} moves.");
                     return null;
                 }
                 if (t == CANCELED) {
-                    Console.WriteLine($"    Solver canceled.");
+                    //Console.WriteLine($"    Solver canceled.");
                     return null;
                 }
                 if (t == TIMEDOUT)
                 {
-                    Console.WriteLine($"    Timed out while looking for solution.");
+                    //Console.WriteLine($"    Timed out while looking for solution.");
                     return null;
                 }
                 if (t >= maxcost) {
-                    Console.WriteLine($"    Bailing due to maxcost ({maxcost}).");
+                    //Console.WriteLine($"    Bailing due to maxcost ({maxcost}).");
                     return null;
                 }
-                Console.WriteLine($"    Pushing bounds to {t} moves");
+                //Console.WriteLine($"    Pushing bounds to {t} moves");
                 solution.Bound = t;
             }
         }
@@ -107,7 +108,7 @@ namespace GenDash {
                 if (tryUntil.Value <= DateTime.Now) 
                     return TIMEDOUT;
             }
-            if (IsCanceled) return CANCELED;
+            if (IsCanceled) return CANCELED;            
             Board node = solution.Path[solution.Path.Count - 1];
             int fcost = gcost + Heuristic(node, ratio);
             if (fcost > solution.Bound) return fcost;

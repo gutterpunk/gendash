@@ -12,12 +12,13 @@
             "program": "${workspaceFolder}/bin/Debug/netcoreapp3.1/win7-x64/GenDash.exe",
             "args": [
                 "-patterns", "patterns.xml",
-                "-playback","4717717198675713857",
-                "-playspeed","400",
+                //"-playback","11198594177781168129",
+                //"-playspeed","400",
                 "-seed", "1",
+                "-minmove","20",
                 "-maxmove","75",
                 "-cpu","12",
-                "-maxtime", "1200"
+                "-maxtime", "600"
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

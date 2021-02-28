@@ -104,7 +104,7 @@ namespace GenDash {
                     Hash = (ulong)puzzle.Element("Hash"),
                 }
             ).ToList<BoardData>();
-
+            Console.CursorVisible = false;
             if (playback > 0) {
                 var pbd = (
                     from puzzle in boardsNode.Descendants("Board")
@@ -122,13 +122,17 @@ namespace GenDash {
                             })
                             .ToList()
                     }).FirstOrDefault();
-                    if (pbd != null) {
+                if (pbd != null) {
+                    Console.Clear();
+                    Console.SetCursorPosition(0, 0);                    
+                    Console.Write("Engine");
+                    Console.SetCursorPosition(pbd.ColCount + 3, 0);                    
+                    Console.Write("Stored");
                     for (int i = 0; i < pbd.IdleFold; i ++) {
                         pbd.Fold();
-                        Console.Clear();
+                        Console.SetCursorPosition(0, 1);                    
                         pbd.Dump();
-                        Console.WriteLine();
-                        Console.WriteLine($"Idle {pbd.IdleFold - i}");
+                        Console.WriteLine($"Idle {pbd.IdleFold - i}".PadRight(40));
                         Thread.Sleep(playbackSpeed);
                     }
                     pbd.Place(new Element(Element.Player), pbd.StartY, pbd.StartX);
@@ -136,14 +140,16 @@ namespace GenDash {
                     foreach (var s in pbd.Solution) {
                         pbd.SetMove(s.Move);
                         pbd.Fold();
-                        Console.Clear();
+                        Console.SetCursorPosition(0, 1);                    
                         pbd.Dump();
                         Console.WriteLine();
                         for (int i = 0; i < s.Data.Length; i += pbd.ColCount) {
-                            Console.WriteLine(s.Data.Substring(i, pbd.ColCount));
+                            Console.SetCursorPosition(pbd.ColCount + 3, (i / pbd.ColCount) + 1);                    
+                            Console.Write(s.Data.Substring(i, pbd.ColCount));
                         }
                         Console.WriteLine();
-                        Console.WriteLine(s.Move);
+                        Console.WriteLine();
+                        Console.WriteLine(s.Move.PadRight(40));
                         Thread.Sleep(playbackSpeed);
                     }
                 }
@@ -203,39 +209,86 @@ namespace GenDash {
             ).ToList<PatternData>();
             Console.WriteLine($"Patterns loaded from {patternDatabase} : {patterns.Count()}");
             Random rnd = new Random(seed);
-            int id = 1;
-            Task[] tasks = new Task[cpu];
+            Dictionary<Task, Worker> tasks = new Dictionary<Task, Worker>();
+            int cposx = 0;//Console.CursorLeft;
+            int cposy = Console.CursorTop + 1;
             using (CancellationTokenSource source = new CancellationTokenSource()) {
                 do {
                     while (!Console.KeyAvailable) {
-
-                        for (int i = 0; i < cpu; i ++) {
-                            if (tasks[i] == null) {
-                                Console.WriteLine($"New thread, Id {id}");
-                                Worker worker = new Worker();
-                                Task t = Task.Factory.StartNew(() => worker.Work(id, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds),
-                                    source.Token);
-                                tasks[i] = t;
-                                id++;
-                            }
+                        int count = Math.Max(0, cpu - tasks.Keys.Where(x => 
+                            x.Status != TaskStatus.Canceled &&
+                            x.Status != TaskStatus.Faulted &&
+                            x.Status != TaskStatus.RanToCompletion).Count());
+                        for (int i = 0; i < count; i ++) {
+                            Worker worker = new Worker();
+                            Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds),
+                                source.Token);
+                            tasks.Add(t, worker);
                         }
-                        try {
-                            Task.WaitAny(tasks);
-                            foreach (Task t in tasks) {
-                                if (t.IsCompleted) {
-                                    for (int i = 0; i < cpu; i ++) {
-                                        if (tasks[i] == t) {
-                                            tasks[i] = null;
-                                        }
+                        Console.SetCursorPosition(cposx, cposy);
+                        foreach (Task t in tasks.Keys) {
+                            int result;
+                            string resultStr;
+                            switch (t.Status) {
+                                case TaskStatus.Running: 
+                                    var now = DateTime.Now;
+                                    var timeout = (tasks[t].Solver.Timeout - tasks[t].Solver.LastSearch).TotalSeconds;
+                                    var progress = 0;
+                                    if (timeout > 0) {
+                                        progress = (int)Math.Ceiling(((now - tasks[t].Solver.LastSearch).TotalSeconds * 60) / timeout);
                                     }
-                                }
-                            }
+                                    result = tasks[t].Solver.LastSearchResult;
+                                    resultStr = result.ToString();
+                                    switch (result) {
+                                        case Solver.NOT_FOUND :
+                                        resultStr = "Not Found";
+                                        break;
+                                        case Solver.FOUND :
+                                        resultStr = "Found";
+                                        break;
+                                    }
+                                    Console.WriteLine($"{t.Id,4} [{"".PadRight(progress, '█').PadRight(60)}] {resultStr}".PadRight(80));
+                                    break;
+                                // case TaskStatus.RanToCompletion:
+                                //     result = tasks[t].Solver.LastSearchResult;
+                                //     switch (result) {
+                                //         case Solver.NOT_FOUND :
+                                //             Console.WriteLine($"{t.Id,4} Not Found".PadRight(80));
+                                //         break;
+                                //         case Solver.FOUND :
+                                //             Console.WriteLine($"{t.Id,4} Found".PadRight(80));
+                                //         break;
+                                //         case Solver.TIMEDOUT :
+                                //             Console.WriteLine($"{t.Id,4} Time out".PadRight(80));
+                                //         break;
+                                //         default:
+                                //             Console.WriteLine($"{t.Id,4} Completed ({tasks[t].Solver.LastSearchResult})".PadRight(80));
+                                //             break;
+                                //     }
+                                //     break;
+                                // default:
+                                //     Console.WriteLine($"{t.Id,4} TaskStatus: {t.Status} / {tasks[t].Solver.LastSearchResult}".PadRight(80));
+                                //     break;
+                            } 
+                        }
+                        Thread.Sleep(500);
+                        // try {
+                        //     Task.WaitAny(tasks);
+                        //     foreach (Task t in tasks) {
+                        //         if (t.IsCompleted) {
+                        //             for (int i = 0; i < cpu; i ++) {
+                        //                 if (tasks[i] == t) {
+                        //                     tasks[i] = null;
+                        //                 }
+                        //             }
+                        //         }
+                        //     }
 
-                        } catch (AggregateException ae) {
-                            Console.WriteLine("One or more exceptions occurred: ");
-                            foreach (var ex in ae.Flatten().InnerExceptions)
-                                Console.WriteLine("   {0}", ex.Message);
-                        }           
+                        // } catch (AggregateException ae) {
+                        //     Console.WriteLine("One or more exceptions occurred: ");
+                        //     foreach (var ex in ae.Flatten().InnerExceptions)
+                        //         Console.WriteLine("   {0}", ex.Message);
+                        // }           
                     }
                 } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
                 source.Cancel();
@@ -243,6 +296,10 @@ namespace GenDash {
         }
     }
     class Worker {
+        public Solver Solver { get; private set; }
+        public Worker() {
+            Solver = new Solver();
+        }
         public void Work(int id, Random rnd, 
             XElement puzzledb,
             string filepath,
@@ -271,13 +328,13 @@ namespace GenDash {
             BoardData existing = records.Where(x => x.Hash == hash).FirstOrDefault();
             if (existing != null)
             {
-                Console.WriteLine($"(Task {id}) Board already exists (hash: {hash}).");
+                //Console.WriteLine($"(Task {id}) Board already exists (hash: {hash}).");
                 return;
             }
             RejectData rejected = rejects.Where(x => x.Hash == hash).FirstOrDefault();
             if (rejected != null)
             {
-                Console.WriteLine($"(Task {id}) Board already rejected (hash: {hash}).");
+                //Console.WriteLine($"(Task {id}) Board already rejected (hash: {hash}).");
                 return;
             }
 
@@ -286,14 +343,13 @@ namespace GenDash {
             }
             board.Place(new Element(Element.Player), board.StartY, board.StartX);
 
-            Console.WriteLine($"(Task {id}) Origin:");
-            original.Dump();
-            Console.WriteLine($"\n(Task {id}) Idle folded:");
-            board.Dump();
-            Solver solver = new Solver();
-            Solution s = solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), maxMove, 1f);
+            //Console.WriteLine($"(Task {id}) Origin:");
+            //original.Dump();
+            //Console.WriteLine($"\n(Task {id}) Idle folded:");
+            //board.Dump();
+            Solution s = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), maxMove, 1f);
             if (s != null && s.Bound < minMove) {
-                Console.WriteLine($"(Task {id}) Move under the minimum ({minMove}), discarding.");
+                //Console.WriteLine($"(Task {id}) Move under the minimum ({minMove}), discarding.");
                 puzzledb.Element("Rejects").Add(
                     new XElement("Reject",
                     new XElement("Hash", hash),
@@ -309,8 +365,8 @@ namespace GenDash {
                 }
                 s = null;
             } else 
-            if (s == null && solver.LastSearchResult == Solver.TIMEDOUT) {
-                Console.WriteLine($"(Task {id}) Timeout, couldn't verify board. Discarding.");
+            if (s == null && Solver.LastSearchResult == Solver.TIMEDOUT) {
+                //Console.WriteLine($"(Task {id}) Timeout, couldn't verify board. Discarding.");
                 puzzledb.Element("Rejects").Add(
                     new XElement("Reject",
                     new XElement("Hash", hash),
@@ -328,7 +384,7 @@ namespace GenDash {
                 s = null;
             } else
             if (s == null) {
-                Console.WriteLine($"(Task {id}) No Solution found. Discarding.");
+                //Console.WriteLine($"(Task {id}) No Solution found. Discarding.");
                 puzzledb.Element("Rejects").Add(
                     new XElement("Reject",
                     new XElement("Hash", hash),
@@ -345,22 +401,22 @@ namespace GenDash {
             }
 
             if (s != null) {
-                Console.WriteLine($"(Task {id}) Trying to find better solutions.");
+                //Console.WriteLine($"(Task {id}) Trying to find better solutions.");
                 float first = s.Bound;
                 do
                 {
-                    Solution better = solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), s.Bound, (s.Bound - 1) / first);
+                    Solution better = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), s.Bound, (s.Bound - 1) / first);
                     if (better != null && better.Bound < s.Bound) {
-                        Console.WriteLine($"(Task {id}) Better solution found: {better.Bound}");
+                        //Console.WriteLine($"(Task {id}) Better solution found: {better.Bound}");
                         s = better;
                         if (s.Bound < minMove) {
-                            Console.WriteLine($"(Task {id}) Move under the minimum ({minMove}), discarding.");
+                            //Console.WriteLine($"(Task {id}) Move under the minimum ({minMove}), discarding.");
                             s = null;
                             break;
                         }
                     } else
-                        if (better == null && solver.LastSearchResult == Solver.TIMEDOUT) {
-                            Console.WriteLine($"(Task {id}) Timeout, couldn't verify board. Discarding.");
+                        if (better == null && Solver.LastSearchResult == Solver.TIMEDOUT) {
+                            //Console.WriteLine($"(Task {id}) Timeout, couldn't verify board. Discarding.");
                             puzzledb.Element("Rejects").Add(
                                 new XElement("Reject",
                                 new XElement("Hash", hash),
@@ -385,7 +441,7 @@ namespace GenDash {
                             s = null;
                             break;
                         } else {
-                            Console.WriteLine($"(Task {id}) No better solution, bailing.");
+                            //Console.WriteLine($"(Task {id}) No better solution, bailing.");
                             break;
                         }
 
@@ -397,6 +453,7 @@ namespace GenDash {
                     {
                         var fold = new XElement("Fold", b.ToString());
                         fold.SetAttributeValue("Move", b.NameMove());
+                        fold.SetAttributeValue("Goals", b.Data.Where(x => x.Details == Element.Diamond).Count());
                         solution.Add(fold);
                         steps++;
                     }
@@ -421,7 +478,7 @@ namespace GenDash {
                             Hash = hash
                         });
                     }
-                    Console.WriteLine($"(Task {id}) Puzzle added to DB");
+                   // Console.WriteLine($"(Task {id}) Puzzle added to DB");
                 }
             } 
         }
