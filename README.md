@@ -48,6 +48,6 @@ Remarks:
 
 * I do not recommand generating caves larger than 15x15. 
 * The outer steel walls are implied during solving. The caves will be created in the whole space specified.
-* The -MaxTime switch is in seconds. The maxtime is for the whole process for one cave, and never reset during generation, which can cause some frustration when we get unlucky and the timeout kicks in right after a success message but before finding the final solution...
+* The -MaxTime switch is in seconds. The maxtime is for one fold of each cave, and reset during generation when a fold is sucessful
 
 See GenDashDB.xml for example of the output.
