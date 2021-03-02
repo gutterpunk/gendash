@@ -250,14 +250,15 @@ namespace GenDash
                 if (Array.Find(board.Data, x => x != null && x.Details == Element.Diamond) == null) 
                     dest = new Element(Element.Space);
             if (dest == null || dest.Details == Space || dest.Details == Dirt || dest.Details == Diamond) {
+                element.Scanned = true;
                 if (board.Grabbing) {
                     board.Place(new Element(Space), row + board.InputY, col + board.InputX);
+                    return (dest != null && dest.Details != Space);
                 } else {
                     board.Place(new Element(Space), row, col);
                     board.Place(element, row + board.InputY, col + board.InputX);
+                    return true;
                 }
-                element.Scanned = true;
-                return true;
             } else {
                 if (board.InputX != 0 && !dest.Scanned && dest.Details == Boulder) {
                     Element behind = board.GetElementAt(row, col + (board.InputX * 2));

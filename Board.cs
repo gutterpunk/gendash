@@ -245,6 +245,12 @@ namespace GenDash {
                     if (moved) {
                         if (e.Details.Important) LastFoldImportant++;
                         nomove = false;
+                    } else {
+                        if (e.Details == Element.Player) {
+                            InputX = 0;
+                            InputY = 0;
+                            Grabbing = false;
+                        }
                     }
                 }
             }
@@ -275,6 +281,7 @@ namespace GenDash {
                     if (e1 != null && e2 == null) return false;
                     if (e1 == null && e2 == null) continue;
                     if (e1.Details != e2.Details) return false;
+                    if (e1.Falling != e2.Falling) return false;
                 }
             }
             
