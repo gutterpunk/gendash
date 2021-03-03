@@ -106,7 +106,7 @@ namespace GenDash {
             ).ToList<BoardData>();
             Console.CursorVisible = false;
             if (playback > 0) {
-                var pbd = (
+                var toPlayback = (
                     from puzzle in boardsNode.Descendants("Board")
                     where (ulong)puzzle.Element("Hash") == playback
                     select new BoardSolution((byte)(int)puzzle.Element("Width"), (byte)(int)puzzle.Element("Height"), (string)puzzle.Element("Data")) {
@@ -122,30 +122,30 @@ namespace GenDash {
                             })
                             .ToList()
                     }).FirstOrDefault();
-                if (pbd != null) {
+                if (toPlayback != null) {
                     Console.Clear();
                     Console.SetCursorPosition(0, 0);                    
                     Console.Write("Engine");
-                    Console.SetCursorPosition(pbd.ColCount + 3, 0);                    
+                    Console.SetCursorPosition(toPlayback.ColCount + 3, 0);                    
                     Console.Write("Stored");
-                    for (int i = 0; i < pbd.IdleFold; i ++) {
-                        pbd.Fold();
+                    for (int i = 0; i < toPlayback.IdleFold; i ++) {
+                        toPlayback.Fold();
                         Console.SetCursorPosition(0, 1);                    
-                        pbd.Dump();
-                        Console.WriteLine($"Idle {pbd.IdleFold - i}".PadRight(40));
+                        toPlayback.Dump();
+                        Console.WriteLine($"Idle {toPlayback.IdleFold - i}".PadRight(40));
                         Thread.Sleep(playbackSpeed);
                     }
-                    pbd.Place(new Element(Element.Player), pbd.StartY, pbd.StartX);
-                    pbd.Solution.Remove(pbd.Solution.First());
-                    foreach (var s in pbd.Solution) {
-                        pbd.SetMove(s.Move);
-                        pbd.Fold();
+                    toPlayback.Place(new Element(Element.Player), toPlayback.StartY, toPlayback.StartX);
+                    toPlayback.Solution.Remove(toPlayback.Solution.First());
+                    foreach (var s in toPlayback.Solution) {
+                        toPlayback.SetMove(s.Move);
+                        toPlayback.Fold();
                         Console.SetCursorPosition(0, 1);                    
-                        pbd.Dump();
+                        toPlayback.Dump();
                         Console.WriteLine();
-                        for (int i = 0; i < s.Data.Length; i += pbd.ColCount) {
-                            Console.SetCursorPosition(pbd.ColCount + 3, (i / pbd.ColCount) + 1);                    
-                            Console.Write(s.Data.Substring(i, pbd.ColCount));
+                        for (int i = 0; i < s.Data.Length; i += toPlayback.ColCount) {
+                            Console.SetCursorPosition(toPlayback.ColCount + 3, (i / toPlayback.ColCount) + 1);                    
+                            Console.Write(s.Data.Substring(i, toPlayback.ColCount));
                         }
                         Console.WriteLine();
                         Console.WriteLine();
@@ -241,54 +241,17 @@ namespace GenDash {
                                     resultStr = result.ToString();
                                     switch (result) {
                                         case Solver.NOT_FOUND :
-                                        resultStr = "Not Found";
+                                        resultStr = "NF";
                                         break;
                                         case Solver.FOUND :
-                                        resultStr = "Found";
+                                        resultStr = "??";
                                         break;
                                     }
-                                    Console.WriteLine($"{t.Id,4} [{"".PadRight(progress, '█').PadRight(60)}] {resultStr}".PadRight(80));
+                                    Console.WriteLine($"{t.Id,4} [{"".PadRight(progress, '█').PadRight(60)}] {resultStr} / {tasks[t].Solver.Tries}".PadRight(80));
                                     break;
-                                // case TaskStatus.RanToCompletion:
-                                //     result = tasks[t].Solver.LastSearchResult;
-                                //     switch (result) {
-                                //         case Solver.NOT_FOUND :
-                                //             Console.WriteLine($"{t.Id,4} Not Found".PadRight(80));
-                                //         break;
-                                //         case Solver.FOUND :
-                                //             Console.WriteLine($"{t.Id,4} Found".PadRight(80));
-                                //         break;
-                                //         case Solver.TIMEDOUT :
-                                //             Console.WriteLine($"{t.Id,4} Time out".PadRight(80));
-                                //         break;
-                                //         default:
-                                //             Console.WriteLine($"{t.Id,4} Completed ({tasks[t].Solver.LastSearchResult})".PadRight(80));
-                                //             break;
-                                //     }
-                                //     break;
-                                // default:
-                                //     Console.WriteLine($"{t.Id,4} TaskStatus: {t.Status} / {tasks[t].Solver.LastSearchResult}".PadRight(80));
-                                //     break;
                             } 
                         }
-                        Thread.Sleep(500);
-                        // try {
-                        //     Task.WaitAny(tasks);
-                        //     foreach (Task t in tasks) {
-                        //         if (t.IsCompleted) {
-                        //             for (int i = 0; i < cpu; i ++) {
-                        //                 if (tasks[i] == t) {
-                        //                     tasks[i] = null;
-                        //                 }
-                        //             }
-                        //         }
-                        //     }
-
-                        // } catch (AggregateException ae) {
-                        //     Console.WriteLine("One or more exceptions occurred: ");
-                        //     foreach (var ex in ae.Flatten().InnerExceptions)
-                        //         Console.WriteLine("   {0}", ex.Message);
-                        // }           
+                        Thread.Sleep(500);       
                     }
                 } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
                 source.Cancel();
@@ -405,7 +368,8 @@ namespace GenDash {
                 float first = s.Bound;
                 do
                 {
-                    Solution better = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), s.Bound, (s.Bound - 1) / first);
+                    Solver.Tries ++;
+                    Solution better = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), s.Bound, (s.Bound - 1) / first);                    
                     if (better != null && better.Bound < s.Bound) {
                         //Console.WriteLine($"(Task {id}) Better solution found: {better.Bound}");
                         s = better;
@@ -449,11 +413,36 @@ namespace GenDash {
                 if (s != null) {
                     XElement solution = new XElement("Solution");
                     int steps = 0;
+                    Board prev = null;
+                    int len = s.Path[0].Data.Length;
                     foreach (Board b in s.Path)
                     {
-                        var fold = new XElement("Fold", b.ToString());
+                        var foldStr = b.ToString();
+                        var fold = new XElement("Fold", foldStr);
                         fold.SetAttributeValue("Move", b.NameMove());
-                        fold.SetAttributeValue("Goals", b.Data.Where(x => x.Details == Element.Diamond).Count());
+                        fold.SetAttributeValue("Goals", b.Data.Where(x => x != null && x.Details == Element.Diamond).Count());
+                        fold.SetAttributeValue("Firefly", b.Data.Where(x => x != null &&  x.Details == Element.Firefly).Count());
+                        fold.SetAttributeValue("Butterfly", b.Data.Where(x => x != null && x.Details == Element.Butterfly).Count());
+                        var diffs = 0;
+                        if (prev != null) {
+                            for (int i = 0; i < len; i ++) {
+                                if (prev.Data[i].Details != b.Data[i].Details) diffs++;
+                            }
+                        }
+                        fold.SetAttributeValue("Diffs", diffs);
+                        fold.SetAttributeValue("Falling", b.Data.Count(x => x.Falling));
+                        fold.SetAttributeValue("Space", b.Data.Count(x => x == null || x.Details == Element.Space));
+                        int proximity = 0;
+                        for (int i = 0; i < len; i ++) {
+                            if (b.Data[i].Details == Element.Firefly || b.Data[i].Details == Element.Butterfly) {
+                                if (i > 0 && b.Data[i - 1].Details == Element.Player) proximity ++;
+                                if (i < len - 1 && b.Data[i + 1].Details == Element.Player) proximity ++;
+                                if (i > b.ColCount && b.Data[i - b.ColCount].Details == Element.Player) proximity ++;
+                                if (i < b.RowCount - 1 && b.Data[i + b.RowCount].Details == Element.Player) proximity ++;
+                            }
+                        }
+                        fold.SetAttributeValue("Proximity", proximity);
+                        prev = b;
                         solution.Add(fold);
                         steps++;
                     }

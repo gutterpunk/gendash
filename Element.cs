@@ -260,7 +260,7 @@ namespace GenDash
                     return true;
                 }
             } else {
-                if (board.InputX != 0 && !dest.Scanned && dest.Details == Boulder) {
+                if (board.InputX != 0 && dest.Details == Boulder && !dest.Falling) {
                     Element behind = board.GetElementAt(row, col + (board.InputX * 2));
                     if (behind == null || behind.Details == Space) {
                         if (board.Grabbing) {
@@ -271,6 +271,7 @@ namespace GenDash
                             board.Place(new Element(Space), row, col);
                             board.Place(element, row, col + board.InputX);
                         }
+                        dest.Scanned = true;
                         element.Scanned = true;
                         return true;
                     }

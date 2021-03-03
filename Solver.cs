@@ -15,6 +15,7 @@ namespace GenDash {
         public int LastSearchResult { get; private set; }
         public DateTime LastSearch { get; private set; }
         public DateTime Timeout { get; private set; }
+        public int Tries { get; set; }
         public Solution Solve(int Id, Board root, TimeSpan delay, int maxcost = int.MaxValue, float ratio = 1f) {
             Solution solution = new Solution {
                 Path = { root },
