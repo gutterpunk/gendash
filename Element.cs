@@ -118,6 +118,7 @@ namespace GenDash
         public static ElementDetails CharToElementDetails(char chr) {
             switch (chr)
             {
+                case '@': return Element.Player;
                 case '.': return Element.Space;
                 case '*': return Element.Dirt;
                 case '#': return Element.Bricks; 
@@ -173,8 +174,8 @@ namespace GenDash
             bool exploded = false;
             for (int r = -1; r <= 1; r++)
                 for (int c = -1; c <= 1; c++) {
-                    bool unit = ExplodeSingle(board, row + r, col + c, toDiamond ? ExplosionToDiamond1 : Explosion1);
-                    unit = ExplodeSingle(board, row + r, col + c, next);
+                    //bool unit = ExplodeSingle(board, row + r, col + c, toDiamond ? ExplosionToDiamond1 : Explosion1);
+                    bool unit = ExplodeSingle(board, row + r, col + c, next);
                     exploded |= unit;
                 }
             return exploded;
@@ -253,12 +254,13 @@ namespace GenDash
                 element.Scanned = true;
                 if (board.Grabbing) {
                     board.Place(new Element(Space), row + board.InputY, col + board.InputX);
-                    return (dest != null && dest.Details != Space);
+                    //return (dest != null && dest.Details != Space); //NTS: "move was consumed and valid"
                 } else {
                     board.Place(new Element(Space), row, col);
                     board.Place(element, row + board.InputY, col + board.InputX);
-                    return true;
+                    //return true;
                 }
+                return true; //NTS: "move was consumed", even if it didn't work in the case of grabbing a space/wall
             } else {
                 if (board.InputX != 0 && dest.Details == Boulder && !dest.Falling) {
                     Element behind = board.GetElementAt(row, col + (board.InputX * 2));
@@ -317,6 +319,11 @@ namespace GenDash
                             board.Place(beside, row, col);
                             board.Place(element, row, leftFirst ? col + 1 : col - 1);
                             element.Falling = true;
+                            return true;
+                        }
+                        else 
+                        {
+                            element.Falling = false;
                             return true;
                         }
                     }

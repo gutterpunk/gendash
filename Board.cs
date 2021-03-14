@@ -176,6 +176,9 @@ namespace GenDash {
                 if (under.Details != null && under.Details == Element.Player) {
                     continue;
                 }
+                if (px == StartX && py == StartY) {
+                    continue;
+                }
                 ExitX = px;
                 ExitY = py;
                 Place(new Element(Element.Steel), py, px);
@@ -246,11 +249,11 @@ namespace GenDash {
                         if (e.Details.Important) LastFoldImportant++;
                         nomove = false;
                     } else {
-                        if (e.Details == Element.Player) {
-                            InputX = 0;
-                            InputY = 0;
-                            Grabbing = false;
-                        }
+                    //    if (e.Details == Element.Player) {
+                    //        InputX = 0;
+                    //        InputY = 0;
+                    //        Grabbing = false;
+                    //    }
                     }
                 }
             }

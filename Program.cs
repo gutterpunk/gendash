@@ -5,11 +5,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text;
 
 namespace GenDash {
     class Fold {
         public string Move { get; set; }
         public string Data { get; set; }
+        public string MoveOrder { get; set; }
     }
     class BoardSolution : Board {
         public List<Fold> Solution { get; set; }
@@ -69,7 +71,7 @@ namespace GenDash {
                     {
                         patternDatabase = args[++i];
                     } else
-                    if (args[i].Equals("-cpu", StringComparison.OrdinalIgnoreCase))
+                    if (args[i].Equals("-tasks", StringComparison.OrdinalIgnoreCase))
                     {
                         cpu = int.Parse(args[++i]);
                     } else
@@ -118,7 +120,8 @@ namespace GenDash {
                         Solution = puzzle.Element("Solution").Elements("Fold")
                             .Select(p => new Fold {
                                 Move = (string)p.Attribute("Move"),
-                                Data = p.Value                                
+                                Data = p.Value,
+                                MoveOrder = (string)p.Attribute("MoveOrder"),     
                             })
                             .ToList()
                     }).FirstOrDefault();
@@ -149,6 +152,7 @@ namespace GenDash {
                         }
                         Console.WriteLine();
                         Console.WriteLine();
+                        //Console.WriteLine(s.MoveOrder.PadRight(80));
                         Console.WriteLine(s.Move.PadRight(40));
                         Thread.Sleep(playbackSpeed);
                     }
@@ -414,38 +418,74 @@ namespace GenDash {
                     XElement solution = new XElement("Solution");
                     int steps = 0;
                     Board prev = null;
-                    int len = s.Path[0].Data.Length;
+                    int len = s.Path[0].Data.Length;                    
+                    int diffTotal = 0;
+                    int goalTotal = 0;
+                    int mobBefore = 0;
+                    int mobAfter = 0;
+                    int fallingDelta = 0;
+                    int proximity = 0;
                     foreach (Board b in s.Path)
                     {
                         var foldStr = b.ToString();
                         var fold = new XElement("Fold", foldStr);
                         fold.SetAttributeValue("Move", b.NameMove());
-                        fold.SetAttributeValue("Goals", b.Data.Where(x => x != null && x.Details == Element.Diamond).Count());
-                        fold.SetAttributeValue("Firefly", b.Data.Where(x => x != null &&  x.Details == Element.Firefly).Count());
-                        fold.SetAttributeValue("Butterfly", b.Data.Where(x => x != null && x.Details == Element.Butterfly).Count());
+                        int goals = b.Data.Where(x => x != null && x.Details == Element.Diamond).Count();
+                        //fold.SetAttributeValue("Goals", goals);
+                        goalTotal += goals;
                         var diffs = 0;
                         if (prev != null) {
                             for (int i = 0; i < len; i ++) {
                                 if (prev.Data[i].Details != b.Data[i].Details) diffs++;
                             }
+                            fallingDelta += prev.Data.Count(x => x.Falling) - b.Data.Count(x => x.Falling);
                         }
-                        fold.SetAttributeValue("Diffs", diffs);
-                        fold.SetAttributeValue("Falling", b.Data.Count(x => x.Falling));
-                        fold.SetAttributeValue("Space", b.Data.Count(x => x == null || x.Details == Element.Space));
-                        int proximity = 0;
+                        diffTotal += diffs;
+                        //fold.SetAttributeValue("Diffs", diffs);
+                        //var ff = b.Data.Count(x => x.Falling);
+                        //if (ff > 0)
+                        //    fold.SetAttributeValue("Falling", ff);
+                        //fold.SetAttributeValue("Space", b.Data.Count(x => x == null || x.Details == Element.Space));
+                        var moveOrder = new StringBuilder();
+                        Boolean before = true;
                         for (int i = 0; i < len; i ++) {
-                            if (b.Data[i].Details == Element.Firefly || b.Data[i].Details == Element.Butterfly) {
+                            var details = b.Data[i].Details;
+                            if (details.Mob) {
                                 if (i > 0 && b.Data[i - 1].Details == Element.Player) proximity ++;
                                 if (i < len - 1 && b.Data[i + 1].Details == Element.Player) proximity ++;
                                 if (i > b.ColCount && b.Data[i - b.ColCount].Details == Element.Player) proximity ++;
-                                if (i < b.RowCount - 1 && b.Data[i + b.RowCount].Details == Element.Player) proximity ++;
+                                if (i < b.ColCount - 1 && b.Data[i + b.ColCount].Details == Element.Player) proximity ++;
+                            }
+                            if (details.Mob || details == Element.Boulder || details == Element.Diamond || details == Element.Player) {
+                                moveOrder.Append(details.Symbols[details.StartFacing]);                                
+                                if (details != Element.Player) {
+                                    if (details.Mob) {
+                                        if (before)
+                                            mobBefore++;
+                                        else 
+                                            mobAfter++;
+                                    }
+                                } else
+                                    before = false;
                             }
                         }
-                        fold.SetAttributeValue("Proximity", proximity);
+                        //if (proximity > 0)
+                        //    fold.SetAttributeValue("Proximity", proximity);
+                        //fold.SetAttributeValue("MoveOrder", moveOrder.ToString());
+
                         prev = b;
                         solution.Add(fold);
                         steps++;
                     }
+                    fallingDelta = Math.Max(-10, fallingDelta * -1);                     
+                    int score = ((int)Math.Ceiling((double)diffTotal / (s.Path.Count - 1)) * 10) + ((mobBefore / s.Path.Count) * 5) + ((mobAfter / s.Path.Count) * 2) + (fallingDelta * 5) + len + ((goalTotal / s.Path.Count) * 3) + (proximity * 12);
+                    solution.SetAttributeValue("AvgDiff" , (int)Math.Ceiling((double)diffTotal / (s.Path.Count - 1)));
+                    solution.SetAttributeValue("AvgGoals" , goalTotal / s.Path.Count);
+                    solution.SetAttributeValue("AvgBefore" , (mobBefore / s.Path.Count));
+                    solution.SetAttributeValue("AvgAfter" , (mobAfter / s.Path.Count));
+                    solution.SetAttributeValue("FallingDelta" , fallingDelta);                    
+                    solution.SetAttributeValue("Proximity" , proximity);                    
+                    solution.SetAttributeValue("Score" , score);
                     puzzledb.Element("Boards").Add(new XElement("Board",
                         new XElement("Hash", original.FNV1aHash()),
                         new XElement("Width", original.ColCount),
