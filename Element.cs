@@ -302,7 +302,7 @@ namespace GenDash
                 board.Place(element, row + 1, col);
                 return true;
             } else {
-                if (under.Details.Rounded) {
+                if (under.Details.Rounded && !under.Falling) {
                     Element beside = leftFirst ? board.GetElementAt(row, col - 1) : board.GetElementAt(row, col + 1);
                     under = leftFirst ? board.GetElementAt(row + 1, col - 1) : board.GetElementAt(row + 1, col + 1);
                     if ((under == null || under.Details == Space) &&
@@ -346,7 +346,7 @@ namespace GenDash
                 board.Place(element, row + 1, col);
                 return true;
             } else {
-                if (under.Details.Rounded) {
+                if (under.Details.Rounded && !under.Falling) {
                     Element beside = leftFirst ? board.GetElementAt(row, col - 1) : board.GetElementAt(row, col + 1);
                     under = leftFirst ? board.GetElementAt(row + 1, col - 1) : board.GetElementAt(row + 1, col + 1);
                     if ((under == null || under.Details == Space) &&
