@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "GenDash": {
+      "commandName": "Project",
+      "commandLineArgs": "-seed 69 -minmove 30 -maxmove 80 -patterns Patterns.xml -maxtime 800 -database Minerush.xml"
+    }
+  }
+}

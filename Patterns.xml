@@ -2,36 +2,28 @@
 <GenDash>
   <Patterns>
     <Pattern>
-      <MinWidth>7</MinWidth>
-      <MinHeight>6</MinHeight>
-      <MaxWidth>15</MaxWidth>
-      <MaxHeight>13</MaxHeight>
+      <MinWidth>5</MinWidth>
+      <MinHeight>5</MinHeight>
+      <MaxWidth>12</MaxWidth>
+      <MaxHeight>12</MaxHeight>
       <MobRatio>0.0</MobRatio>      
-      <DNA>...******#d00...******#dd00&lt;M</DNA>
-      <Commands></Commands>
-    </Pattern>    <Pattern>
-      <MinWidth>7</MinWidth>
-      <MinHeight>6</MinHeight>
-      <MaxWidth>15</MaxWidth>
-      <MaxHeight>13</MaxHeight>
-      <MobRatio>0.035</MobRatio>      
-      <DNA>......****#d00......****#dd00&lt;M</DNA>
-      <Commands></Commands>
-    </Pattern>
-    <Pattern>
-      <MinWidth>7</MinWidth>
-      <MinHeight>6</MinHeight>
-      <MaxWidth>15</MaxWidth>
-      <MaxHeight>13</MaxHeight>
-      <MobRatio>0.07</MobRatio>      
-      <DNA>........****#d00........****#dd00&lt;M&lt;M</DNA>
+      <DNA>...******%#d00...******#dd00&lt;M</DNA>
       <Commands></Commands>
     </Pattern>    
     <Pattern>
-      <MinWidth>7</MinWidth>
+      <MinWidth>5</MinWidth>
       <MinHeight>5</MinHeight>
-      <MaxWidth>13</MaxWidth>
-      <MaxHeight>11</MaxHeight>
+      <MaxWidth>12</MaxWidth>
+      <MaxHeight>12</MaxHeight>
+      <MobRatio>0.07</MobRatio>      
+      <DNA>........****%#d00........****%#dd00&lt;M&lt;M</DNA>
+      <Commands></Commands>
+    </Pattern>    
+    <Pattern>
+      <MinWidth>5</MinWidth>
+      <MinHeight>5</MinHeight>
+      <MaxWidth>12</MaxWidth>
+      <MaxHeight>12</MaxHeight>
       <MobRatio>0.02</MobRatio>      
       <Start>
         <X>0.1</X>
@@ -41,7 +33,7 @@
         <X>0.8</X>
         <Y>0.8</Y>
       </Exit>
-      <DNA>....******0d&lt;M</DNA>
+      <DNA>....******%0d&lt;M</DNA>
       <Commands>
         <Command>
           <Type>Line</Type>
@@ -70,20 +62,54 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>8</MinWidth>
-      <MinHeight>8</MinHeight>
-      <MaxWidth>14</MaxWidth>
-      <MaxHeight>14</MaxHeight>
+      <MinWidth>5</MinWidth>
+      <MinHeight>5</MinHeight>
+      <MaxWidth>12</MaxWidth>
+      <MaxHeight>12</MaxHeight>
       <MobRatio>0.02</MobRatio>
-      <DNA>....******d00&lt;M</DNA>
       <Start>
-        <X>0.1</X>
-        <Y>0.1</Y>
-      </Start>
-      <Exit>
         <X>0.8</X>
         <Y>0.8</Y>
-      </Exit>      
+      </Start>
+      <Exit>
+        <X>0.1</X>
+        <Y>0.1</Y>
+      </Exit>
+      <DNA>....******%0d&lt;M</DNA>
+      <Commands>
+        <Command>
+          <Type>Line</Type>
+          <From>
+            <X>0.3</X>
+            <Y>0.3</Y>
+          </From>
+          <To>
+            <X>1</X>
+            <Y>0.3</Y>
+          </To>
+          <Element>#</Element>
+        </Command>
+        <Command>
+          <Type>Line</Type>
+          <From>
+            <X>0</X>
+            <Y>0.6</Y>
+          </From>
+          <To>
+            <X>0.7</X>
+            <Y>0.6</Y>
+          </To>
+          <Element>#</Element>
+        </Command>
+      </Commands>
+    </Pattern>
+    <Pattern>
+      <MinWidth>5</MinWidth>
+      <MinHeight>5</MinHeight>
+      <MaxWidth>12</MaxWidth>
+      <MaxHeight>12</MaxHeight>
+      <MobRatio>0.02</MobRatio>
+      <DNA>....******%d00&lt;M</DNA>     
       <Commands>
         <Command>
           <Type>Line</Type>
@@ -124,12 +150,12 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>8</MinWidth>
-      <MinHeight>8</MinHeight>
-      <MaxWidth>14</MaxWidth>
-      <MaxHeight>14</MaxHeight>
+      <MinWidth>5</MinWidth>
+      <MinHeight>5</MinHeight>
+      <MaxWidth>12</MaxWidth>
+      <MaxHeight>12</MaxHeight>
       <MobRatio>0.02</MobRatio>
-      <DNA>....******0d&lt;M</DNA>
+      <DNA>....******0%d&lt;M</DNA>
       <Commands>
         <Command>
           <Type>Line</Type>
@@ -158,12 +184,12 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>7</MinWidth>
+      <MinWidth>5</MinWidth>
       <MinHeight>5</MinHeight>
-      <MaxWidth>15</MaxWidth>
+      <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
-      <MobRatio>0.02</MobRatio>
-      <DNA>....******0d&lt;M</DNA>
+      <MobRatio>0.05</MobRatio>
+      <DNA>....******%0d&lt;M</DNA>
       <Commands>
         <Command>
           <Type>Line</Type>
@@ -188,6 +214,62 @@
             <Y>0.7</Y>
           </To>
           <Element>#</Element>
+        </Command>
+      </Commands>
+    </Pattern>
+    <Pattern>
+      <MinWidth>5</MinWidth>
+      <MinHeight>5</MinHeight>
+      <MaxWidth>12</MaxWidth>
+      <MaxHeight>12</MaxHeight>
+      <MobRatio>0.02</MobRatio>
+      <DNA>....******%0d&lt;&lt;M</DNA>
+      <Commands>
+        <Command>
+          <Type>Rectangle</Type>
+          <From>
+            <X>0.4</X>
+            <Y>0.4</Y>
+          </From>
+          <To>
+            <X>0.6</X>
+            <Y>0.6</Y>
+          </To>
+          <Element>#</Element>
+        </Command>
+      </Commands>      
+    </Pattern>
+    <Pattern>
+      <MinWidth>5</MinWidth>
+      <MinHeight>5</MinHeight>
+      <MaxWidth>12</MaxWidth>
+      <MaxHeight>12</MaxHeight>
+      <MobRatio>0.05</MobRatio>
+      <DNA>....******%0d&lt;&lt;M</DNA>
+      <Commands>
+        <Command>
+          <Type>Rectangle</Type>
+          <From>
+            <X>0.25</X>
+            <Y>0.25</Y>
+          </From>
+          <To>
+            <X>0.75</X>
+            <Y>0.75</Y>
+          </To>
+          <Element>#</Element>
+        </Command>
+        <Command>
+          <Type>Line</Type>
+          <From>
+            <X>0.5</X>
+            <Y>0.5</Y>
+          </From>
+          <To>
+            <X>0.5</X>
+            <Y>0.8</Y>
+          </To>
+          <Element>.</Element>
         </Command>
       </Commands>
     </Pattern>

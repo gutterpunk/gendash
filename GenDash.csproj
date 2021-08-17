@@ -4,19 +4,23 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <RuntimeIdentifier>win7-x64</RuntimeIdentifier>
     <OutputType>Exe</OutputType>
-  </PropertyGroup>  
+  </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
+    <None Remove="Minerush.xml" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Minerush.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="GenDashDB.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <SubType>Designer</SubType>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Patterns.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

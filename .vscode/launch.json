@@ -14,7 +14,7 @@
                 "-patterns", "patterns.xml",
                 //"-playback","5357163157912520986",
                 //"-playspeed","400",
-                "-seed", "1",
+                "-seed", "10",
                 "-minmove","20",
                 "-maxmove","60",
                 "-tasks","6",

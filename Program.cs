@@ -33,6 +33,7 @@ namespace GenDash {
             int seed = int.MaxValue;
             int maxNoMove = 10;
             int minMove = 15;
+            int minScore = 100;
             int maxMove = 75;
             int idleFold = 5; //NEVER CHANGE THAT!
             int maxSolutionSeconds = 600;
@@ -63,7 +64,7 @@ namespace GenDash {
                     {
                         idleFold = int.Parse(args[++i]);
                     } else
-                    if (args[i].Equals("-xmldatabase", StringComparison.OrdinalIgnoreCase))
+                    if (args[i].Equals("-database", StringComparison.OrdinalIgnoreCase))
                     {
                         xmlDatabase = args[++i];
                     } else
@@ -82,6 +83,11 @@ namespace GenDash {
                     if (args[i].Equals("-playspeed", StringComparison.OrdinalIgnoreCase))
                     {
                         playbackSpeed = int.Parse(args[++i]);
+                    }
+                    else
+                    if (args[i].Equals("-minscore", StringComparison.OrdinalIgnoreCase))
+                    {
+                        minScore = int.Parse(args[++i]);
                     }
                 }
             } catch (Exception e) {
@@ -225,7 +231,7 @@ namespace GenDash {
                             x.Status != TaskStatus.RanToCompletion).Count());
                         for (int i = 0; i < count; i ++) {
                             Worker worker = new Worker();
-                            Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, idleFold, maxSolutionSeconds),
+                            Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
                                 source.Token);
                             tasks.Add(t, worker);
                         }
@@ -267,7 +273,7 @@ namespace GenDash {
         public Worker() {
             Solver = new Solver();
         }
-        public void Work(int id, Random rnd, 
+        public void Work(int id, Random rnd,
             XElement puzzledb,
             string filepath,
             List<BoardData> records,
@@ -276,6 +282,7 @@ namespace GenDash {
             int maxNoMove,
             int minMove,
             int maxMove,
+            int minScore,
             int idleFold,
             int maxSolutionSeconds) {
 
@@ -479,33 +486,67 @@ namespace GenDash {
                     }
                     fallingDelta = Math.Max(-10, fallingDelta * -1);                     
                     int score = ((int)Math.Ceiling((double)diffTotal / (s.Path.Count - 1)) * 10) + ((mobBefore / s.Path.Count) * 5) + ((mobAfter / s.Path.Count) * 2) + (fallingDelta * 5) + len + ((goalTotal / s.Path.Count) * 3) + (proximity * 12);
-                    solution.SetAttributeValue("AvgDiff" , (int)Math.Ceiling((double)diffTotal / (s.Path.Count - 1)));
-                    solution.SetAttributeValue("AvgGoals" , goalTotal / s.Path.Count);
-                    solution.SetAttributeValue("AvgBefore" , (mobBefore / s.Path.Count));
-                    solution.SetAttributeValue("AvgAfter" , (mobAfter / s.Path.Count));
-                    solution.SetAttributeValue("FallingDelta" , fallingDelta);                    
-                    solution.SetAttributeValue("Proximity" , proximity);                    
-                    solution.SetAttributeValue("Score" , score);
-                    puzzledb.Element("Boards").Add(new XElement("Board",
-                        new XElement("Hash", original.FNV1aHash()),
-                        new XElement("Width", original.ColCount),
-                        new XElement("Height", original.RowCount),
-                        new XElement("Par", steps),
-                        new XElement("StartX", original.StartX),
-                        new XElement("StartY", original.StartY),
-                        new XElement("ExitX", original.ExitX),
-                        new XElement("ExitY", original.ExitY),
-                        new XElement("Idle", idleFold),
-                        new XElement("Data", original.ToString()),
-                        solution
-                    ));
-                    lock(puzzledb) {
-                        puzzledb.Save(filepath);
+                    solution.SetAttributeValue("AvgDiff", (int)Math.Ceiling((double)diffTotal / (s.Path.Count - 1)));
+                    solution.SetAttributeValue("AvgGoals", goalTotal / s.Path.Count);
+                    solution.SetAttributeValue("AvgBefore", (mobBefore / s.Path.Count));
+                    solution.SetAttributeValue("AvgAfter", (mobAfter / s.Path.Count));
+                    solution.SetAttributeValue("FallingDelta", fallingDelta);
+                    solution.SetAttributeValue("Proximity", proximity);
+                    solution.SetAttributeValue("Score", score);
+                    if (score >= minScore)
+                    {
+                        puzzledb.Element("Boards").Add(new XElement("Board",
+                            new XElement("Hash", original.FNV1aHash()),
+                            new XElement("Width", original.ColCount),
+                            new XElement("Height", original.RowCount),
+                            new XElement("Par", steps),
+                            new XElement("StartX", original.StartX),
+                            new XElement("StartY", original.StartY),
+                            new XElement("ExitX", original.ExitX),
+                            new XElement("ExitY", original.ExitY),
+                            new XElement("Idle", idleFold),
+                            new XElement("Data", original.ToString()),
+                            solution
+                        ));
+                        lock (puzzledb)
+                        {
+                            puzzledb.Save(filepath);
+                        }
+                        lock (records)
+                        {
+                            records.Add(new BoardData
+                            {
+                                Hash = hash
+                            });
+                        }
                     }
-                    lock(records) {
-                        records.Add(new BoardData {
-                            Hash = hash
-                        });
+                    else
+                    {
+                        puzzledb.Element("Rejects").Add(
+                               new XElement("Reject",
+                               new XElement("Hash", hash),
+                               new XElement("Width", original.ColCount),
+                               new XElement("Height", original.RowCount),
+                               new XElement("StartX", original.StartX),
+                               new XElement("StartY", original.StartY),
+                               new XElement("ExitX", original.ExitX),
+                               new XElement("ExitY", original.ExitY),
+                               new XElement("Reason", "Min score"),
+                               new XElement("Idle", idleFold),
+                               new XElement("Data", original.ToString()),
+                               solution
+                           ));
+                        lock (puzzledb)
+                        {
+                            puzzledb.Save(filepath);
+                        }
+                        lock (rejects)
+                        {
+                            rejects.Add(new RejectData
+                            {
+                                Hash = hash
+                            });
+                        }
                     }
                    // Console.WriteLine($"(Task {id}) Puzzle added to DB");
                 }

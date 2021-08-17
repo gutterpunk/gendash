@@ -1,3 +1,7 @@
 bin/
 obj/
 GenDashDB.xml
+/.vs/gendash/v16/.suo
+/.vs/gendash/DesignTimeBuild
+/.vs
+/Minerush.xml
