@@ -162,20 +162,30 @@ namespace GenDash
             }
         }
 
-        public static bool ExplodeSingle(Board board, int row, int col, ElementDetails nextElement) {
+        public static bool ExplodeSingle(Board board, int row, int col, int fromRow, int fromCol, bool toDiamond) {
             Element element = board.GetElementAt(row, col);
             if (element == null || element.Details.Indestructible) return false;
-            board.Place(new Element(nextElement) { Scanned = true }, row, col);
+            var fromIndex = (fromRow * board.ColCount) + fromCol;
+            var index = (row * board.ColCount) + col;
+            var scanned = index <= fromIndex;
+            ElementDetails next;
+            if (toDiamond)
+            {
+                if (scanned) next = Element.ExplosionToDiamond1; else next = Element.ExplosionToDiamond0;
+            }
+            else
+            {
+                if (scanned) next = Element.Explosion1; else next = Element.Explosion0;
+            }
+            board.Place(new Element(next) { Scanned = index <= fromIndex }, row, col);
 
             return true;
         }
         public static bool Explode(Board board, int row, int col, bool toDiamond) {
-            ElementDetails next = toDiamond ? ExplosionToDiamond1 : Explosion1;
             bool exploded = false;
             for (int r = -1; r <= 1; r++)
                 for (int c = -1; c <= 1; c++) {
-                    //bool unit = ExplodeSingle(board, row + r, col + c, toDiamond ? ExplosionToDiamond1 : Explosion1);
-                    bool unit = ExplodeSingle(board, row + r, col + c, next);
+                    bool unit = ExplodeSingle(board, row + r, col + c, row, col, toDiamond);
                     exploded |= unit;
                 }
             return exploded;
@@ -204,43 +214,43 @@ namespace GenDash
                 moved = FoldFirefly(board, this, row, col);
             } else
             if (Details == Explosion0) {
-                board.Place(new Element(Explosion1), row, col);
+                board.Place(new Element(Explosion1) { Scanned = true }, row, col);
                 moved = true;
             } else
             if (Details == Explosion1) {
-                board.Place(new Element(Explosion2), row, col);
+                board.Place(new Element(Explosion2) { Scanned = true }, row, col);
                 moved = true;
             } else
             if (Details == Explosion2) { 
-                board.Place(new Element(Explosion3), row, col);
+                board.Place(new Element(Explosion3) { Scanned = true }, row, col);
                 moved = true;
             } else
             if (Details == Explosion3) {
-                board.Place(new Element(Explosion4), row, col);
+                board.Place(new Element(Explosion4) { Scanned = true }, row, col);
                 moved = true;
             } else
             if (Details == Explosion4) {
-                board.Place(new Element(Space), row, col);
+                board.Place(new Element(Space) { Scanned = true }, row, col);
                 moved = true;
             } else
             if (Details == ExplosionToDiamond0) {
-                board.Place(new Element(ExplosionToDiamond1), row, col);
+                board.Place(new Element(ExplosionToDiamond1) { Scanned = true }, row, col);
                 moved = true;
             } else
             if (Details == ExplosionToDiamond1) {
-                board.Place(new Element(ExplosionToDiamond2), row, col);
+                board.Place(new Element(ExplosionToDiamond2) { Scanned = true }, row, col);
                 moved = true;
             } else
             if (Details == ExplosionToDiamond2) {
-                board.Place(new Element(ExplosionToDiamond3), row, col);
+                board.Place(new Element(ExplosionToDiamond3) { Scanned = true }, row, col);
                 moved = true;
             } else
             if (Details == ExplosionToDiamond3) {
-                board.Place(new Element(ExplosionToDiamond4), row, col);
+                board.Place(new Element(ExplosionToDiamond4) { Scanned = true }, row, col);
                 moved = true;
             } else
             if (Details == ExplosionToDiamond4) {
-                board.Place(new Element(Diamond), row, col);
+                board.Place(new Element(Diamond) { Scanned = true }, row, col);
                 moved = true;
             }
             return moved;
