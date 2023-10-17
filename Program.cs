@@ -105,6 +105,14 @@ namespace GenDash {
             } else {
                 puzzledb = new XElement("GenDash");                
             }
+            if (puzzledb.Element("Boards") == null)
+            {
+                puzzledb.Add(new XElement("Boards"));
+            }
+            if (puzzledb.Element("Rejects") == null)
+            {
+                puzzledb.Add(new XElement("Rejects"));
+            }
             IEnumerable<XElement> boardsNode = puzzledb.Descendants("Boards"); 
             List<BoardData> records = (
                 from puzzle in boardsNode.Descendants("Board")

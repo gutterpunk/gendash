@@ -9,10 +9,6 @@
     <None Remove="Minerush.xml" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Minerush.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      <SubType>Designer</SubType>
-    </Content>
     <Content Include="GenDashDB.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <SubType>Designer</SubType>

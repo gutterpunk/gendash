@@ -2,7 +2,7 @@
   "profiles": {
     "GenDash": {
       "commandName": "Project",
-      "commandLineArgs": "-seed 42 -minmove 20 -maxmove 50 -patterns Patterns.xml -maxtime 800 -database Minerush.xml -minscore 100 -tasks 8"
+      "commandLineArgs": "-seed 42 -minmove 20 -maxmove 50 -patterns Patterns.xml -maxtime 800 -database 80CaveGame.xml -minscore 100 -tasks 8"
     }
   }
 }
