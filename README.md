@@ -1,7 +1,7 @@
 # gendash
 Solver and Generator for Boulder Dash/Supaplex style "caves"
 
-In C#, using Dot Net Core 2.1. Coded in VSCode.
+In C#, using Net 8. Coded in Visual Studio 2022.
 
 The Solver is an implementation of Iterative Deepening A*
 
@@ -30,26 +30,33 @@ Implemented so far:
 * Butterflies
 * Fireflies
 
-Magic walls are next, as they work well in a puzzle. Custom, non-BD related blocks are also planned.
+Custom, non-BD related blocks are also planned.
 
 Usage:
 |Switch         |Description                                              |
 |:--------------|:--------------------------------------------------------|
 |-patterns      |Room patterns file                                       |
+|-database      |Database file name (default: GenDashDB.xml)              |
+|-format        |Output format: xml, binary (default: xml)                |
 |-playback      |Hash of a cave in the database to display                |
 |-playspeed     |Playback speed                                           |
 |-seed          |Seed that controls the generationof the cave's seeds     |
 |-minmove       |Minimum moves to accept                                  |
 |-maxmove       |Maximum moves to accept                                  |
-|-cpu           |Number of Threads to start                               |
+|-minscore      |Minimum score to accept                                  |
+|-tasks         |Number of Threads to start (alias: -cpu)                 |
 |-maxtime       |Maximum time spent looking for a solution, in seconds    |
-|-maxempty      |Maximum number of folds spent without the player moving  |
 |-idle          |Number of folds to skip at the cave's opening            |
+
+For detailed file format specifications instructions, see [FORMAT_SYSTEM.md](FORMAT_SYSTEM.md).
 
 Remarks:
 
 * I do not recommand generating caves larger than 15x15. 
-* The outer steel walls are implied during solving. The caves will be created in the whole space specified.
+* The outer steel walls are implied during solving. The caves will be created in the whole space specified, Exits will never be in the outer walls without an explicit pattern in Pattern.xml.
 * The -MaxTime switch is in seconds. The maxtime is for one fold of each cave, and reset during generation when a fold is sucessful
 
-See GenDashDB.xml for example of the output.
+See GenDashDB.xml for example of the output. The caves can be played.
+
+EDIT: 6 years later, migrated to .NET 8 and Visual Studio 2022. I had to revise the code too, I got better at C#. The solver was allocating too much of everything before, the GC was crazy.
+I plan on using generated maps for another project.

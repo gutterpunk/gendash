@@ -13,12 +13,10 @@ namespace GenDash.Engine {
         }
         public void Work(int id, Random rnd,
             XElement puzzledb,
-            string filepath,
             HashSet<ulong> recordHashes,
             List<PatternData> patterns,
             HashSet<ulong> rejectHashes,
             System.Collections.Concurrent.ConcurrentQueue<Action> saveQueue,
-            int maxNoMove,
             int minMove,
             int maxMove,
             int minScore,
@@ -39,7 +37,6 @@ namespace GenDash.Engine {
             Board original = new Board(board);
             ulong hash = original.FNV1aHash();
             
-            // O(1) lookup instead of O(n)
             if (recordHashes.Contains(hash))
             {
                 return;

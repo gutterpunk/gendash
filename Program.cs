@@ -43,7 +43,6 @@ namespace GenDash {
 
         static void Main(string[] args) {
             int seed = int.MaxValue;
-            int maxNoMove = 10;
             int minMove = 15;
             int minScore = 100;
             int maxMove = 75;
@@ -52,15 +51,13 @@ namespace GenDash {
             int cpu = Environment.ProcessorCount - 1;
             string xmlDatabase = "GenDashDB.xml";
             string patternDatabase = null;
+            string format = "xml";
             ulong playback = 0;
             int playbackSpeed = 200;
             try {
                 for (int i = 0; i < args.Length; i++) {
                     if (args[i].Equals("-seed", StringComparison.OrdinalIgnoreCase)) {
                         seed = int.Parse(args[++i]);
-                    } else
-                    if (args[i].Equals("-maxempty", StringComparison.OrdinalIgnoreCase)) {
-                        maxNoMove = int.Parse(args[++i]);
                     } else
                     if (args[i].Equals("-minmove", StringComparison.OrdinalIgnoreCase)) {
                         minMove = int.Parse(args[++i]);
@@ -101,6 +98,11 @@ namespace GenDash {
                     {
                         minScore = int.Parse(args[++i]);
                     }
+                    else
+                    if (args[i].Equals("-format", StringComparison.OrdinalIgnoreCase))
+                    {
+                        format = args[++i];
+                    }
                 }
             } catch (Exception e) {
                 Console.WriteLine(e.Message);
@@ -108,14 +110,37 @@ namespace GenDash {
             }            
             if (patternDatabase == null) patternDatabase = xmlDatabase;
             if (seed == int.MaxValue) seed = DateTime.Now.Millisecond;
+            
+            IFormatConverter converter;
+            try {
+                converter = FormatConverterFactory.CreateConverter(format);
+            } catch (ArgumentException ex) {
+                Console.WriteLine(ex.Message);
+                return;
+            }
+            
             var currentDirectory = Directory.GetCurrentDirectory();
             var filepath = Path.Combine(currentDirectory, xmlDatabase);
+            var filepathWithoutExt = Path.Combine(currentDirectory, Path.GetFileNameWithoutExtension(xmlDatabase));
 
             XElement puzzledb;
-            if (File.Exists(filepath)) {
+            if (File.Exists(Path.ChangeExtension(filepathWithoutExt, converter.FileExtension))) {
+                try {
+                    puzzledb = converter.Load(filepathWithoutExt);
+                    Console.WriteLine($"Loaded database from {Path.GetFileName(Path.ChangeExtension(filepathWithoutExt, converter.FileExtension))}");
+                } catch (Exception ex) {
+                    Console.WriteLine($"Error loading from format: {ex.Message}");
+                    Console.WriteLine("Attempting to load from XML...");
+                    if (File.Exists(filepath)) {
+                        puzzledb = XElement.Load(filepath);
+                    } else {
+                        puzzledb = new XElement("GenDash");
+                    }
+                }
+            } else if (File.Exists(filepath)) {
                 puzzledb = XElement.Load(filepath);
             } else {
-                puzzledb = new XElement("GenDash");                
+                puzzledb = new XElement("GenDash");
             }
             if (puzzledb.Element("Boards") == null)
             {
@@ -238,12 +263,14 @@ namespace GenDash {
             Console.WriteLine($"Patterns loaded from {patternDatabase} : {patterns.Count()}");
             Random rnd = new Random(seed);
             Dictionary<Task, Worker> tasks = new Dictionary<Task, Worker>();
-            int cposx = 0;//Console.CursorLeft;
+            int cposx = 0;
             int cposy = Console.CursorTop + 1;
             
             var saveQueue = new System.Collections.Concurrent.ConcurrentQueue<Action>();
             DateTime lastSave = DateTime.Now;
-            int saveIntervalSeconds = 5; 
+            DateTime lastUIUpdate = DateTime.Now;
+            int saveIntervalSeconds = 5;
+            int uiUpdateIntervalMs = 1000; // Update UI every 1 second instead of 500ms
             
             using (CancellationTokenSource source = new CancellationTokenSource()) {
                 do {
@@ -252,60 +279,57 @@ namespace GenDash {
                             x.Status != TaskStatus.Canceled &&
                             x.Status != TaskStatus.Faulted &&
                             x.Status != TaskStatus.RanToCompletion).Count());
+                        
                         for (int i = 0; i < count; i ++) {
                             Worker worker = new Worker();
-                            Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, filepath, recordHashes, patterns, rejectHashes, saveQueue, maxNoMove, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
+                            Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, recordHashes, patterns, rejectHashes, saveQueue, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
                                 source.Token);
                             tasks.Add(t, worker);
                         }
                         
-                        // Process batched saves
                         if ((DateTime.Now - lastSave).TotalSeconds >= saveIntervalSeconds && saveQueue.Count > 0) {
                             lock(puzzledb) {
                                 while (saveQueue.TryDequeue(out var action)) {
                                     action();
                                 }
-                                puzzledb.Save(filepath);
+                                converter.Save(puzzledb, filepathWithoutExt);
                             }
                             lastSave = DateTime.Now;
                         }
                         
-                        TrySetCursorPosition(cposx, cposy);
-                        foreach (Task t in tasks.Keys) {
-                            int result;
-                            string resultStr;
-                            switch (t.Status) {
-                                case TaskStatus.Running: 
+                        // Only update UI periodically to reduce overhead
+                        if ((DateTime.Now - lastUIUpdate).TotalMilliseconds >= uiUpdateIntervalMs) {
+                            TrySetCursorPosition(cposx, cposy);
+                            foreach (Task t in tasks.Keys) {
+                                if (t.Status == TaskStatus.Running) {
                                     var now = DateTime.Now;
                                     var timeout = (tasks[t].Solver.Timeout - tasks[t].Solver.LastSearch).TotalSeconds;
                                     var progress = 0;
                                     if (timeout > 0) {
                                         progress = (int)Math.Ceiling(((now - tasks[t].Solver.LastSearch).TotalSeconds * 60) / timeout);
+                                        progress = Math.Min(progress, 60); // Cap at 60
                                     }
-                                    result = tasks[t].Solver.LastSearchResult;
-                                    resultStr = result.ToString();
-                                    switch (result) {
-                                        case Solver.NOT_FOUND :
-                                        resultStr = "NF";
-                                        break;
-                                        case Solver.FOUND :
-                                        resultStr = "??";
-                                        break;
-                                    }
+                                    int result = tasks[t].Solver.LastSearchResult;
+                                    string resultStr = result switch {
+                                        Solver.NOT_FOUND => "NF",
+                                        Solver.FOUND => "??",
+                                        _ => result.ToString()
+                                    };
                                     Console.WriteLine($"{t.Id,4} [{"".PadRight(progress, '█').PadRight(60)}] {resultStr} / {tasks[t].Solver.Tries}".PadRight(80));
-                                    break;
-                            } 
+                                }
+                            }
+                            lastUIUpdate = DateTime.Now;
                         }
-                        Thread.Sleep(500);       
+                        
+                        Thread.Sleep(100); // Reduced from 500ms to 100ms
                     }
                 } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
                 
-                // Final save on exit
                 lock(puzzledb) {
                     while (saveQueue.TryDequeue(out var action)) {
                         action();
                     }
-                    puzzledb.Save(filepath);
+                    converter.Save(puzzledb, filepathWithoutExt);
                 }
                 
                 source.Cancel();

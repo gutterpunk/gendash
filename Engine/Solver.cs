@@ -8,6 +8,11 @@ namespace GenDash.Engine {
         public int Bound { get; set; }
     }
     public class Solver {
+        private readonly List<Board> _successorBuffer = new List<Board>(9);
+        private readonly HashSet<ulong> _pathHashes = new HashSet<ulong>();
+        private readonly Point[] _diamondBuffer = new Point[32];
+        private int _diamondBufferCount = 0;
+        
         public bool IsCanceled { get; private set; }
         public const int FOUND = int.MaxValue;
         public const int NOT_FOUND = int.MaxValue - 1;
@@ -17,6 +22,13 @@ namespace GenDash.Engine {
         public DateTime LastSearch { get; private set; }
         public DateTime Timeout { get; private set; }
         public int Tries { get; set; }
+        
+        public Solver() {
+            for (int i = 0; i < _diamondBuffer.Length; i++) {
+                _diamondBuffer[i] = new Point();
+            }
+        }
+        
         public Solution Solve(int Id, Board root, TimeSpan delay, int maxcost = int.MaxValue, float ratio = 1f) {
             Solution solution = new Solution {
                 Path = { root },
@@ -24,145 +36,180 @@ namespace GenDash.Engine {
             };
             while (true) {
                 LastSearch = DateTime.Now;
-                Timeout =  DateTime.Now.AddSeconds(delay.TotalSeconds);
-                //Console.WriteLine($"(Task {Id}) Searching bounds {solution.Bound} until {tryUntil.ToString("HH:mm:ss")}");
+                Timeout = DateTime.Now.AddSeconds(delay.TotalSeconds);
+                _pathHashes.Clear();
+                
                 int t = Search(solution, 0, Timeout, ratio);
                 LastSearchResult = t;
-                //Console.WriteLine($"(Task {Id}) Spent {(DateTime.Now - started).TotalSeconds.ToString("0.##")}s on last bounds.");
+                
                 if (t == FOUND) {
-                    //Console.WriteLine($"    Solution found in {solution.Bound} moves.");
                     return solution;
                 }
                 if (t == NOT_FOUND) {
-                    //Console.WriteLine($"    No solution found in {solution.Bound} moves.");
                     return null;
                 }
                 if (t == CANCELED) {
-                    //Console.WriteLine($"    Solver canceled.");
                     return null;
                 }
                 if (t == TIMEDOUT)
                 {
-                    //Console.WriteLine($"    Timed out while looking for solution.");
                     return null;
                 }
                 if (t >= maxcost) {
-                    //Console.WriteLine($"    Bailing due to maxcost ({maxcost}).");
                     return null;
                 }
-                //Console.WriteLine($"    Pushing bounds to {t} moves");
                 solution.Bound = t;
             }
         }
+        
         public void Cancel() {
             IsCanceled = true;
         }
+        
         private int Heuristic(Board node, float ratio = 1f) {
             int d = 0;
             int x = -1;
             int y = -1;
-            List<Point> diamonds = new List<Point>();
+            
+            _diamondBufferCount = 0;
             
             int totalElements = node.RowCount * node.ColCount;
             for (int i = 0; i < totalElements; i++) {
                 Element e = node.Data[i];
                 if (e == null) continue;
+                
                 if (e.Details == Element.Diamond) {
-                    diamonds.Add(new Point { X = i % node.ColCount, Y = i / node.ColCount });
-                }
-                if (e.Details == Element.Player) {
+                    if (_diamondBufferCount < _diamondBuffer.Length) {
+                        _diamondBuffer[_diamondBufferCount].X = i % node.ColCount;
+                        _diamondBuffer[_diamondBufferCount].Y = i / node.ColCount;
+                        _diamondBufferCount++;
+                    }
+                } else if (e.Details == Element.Player) {
                     x = i % node.ColCount;
                     y = i / node.ColCount;
                 }
             }
             
-            int dx, dy;
-            while (diamonds.Count > 0) {
-                int m = int.MaxValue;
-                Point closest = null;
-                foreach (Point p in diamonds) {
-                    dx = Math.Abs(x - p.X);
-                    dy = Math.Abs(y - p.Y);
-                    if (dx + dy < m) {
-                        closest = p;
-                        m = dx + dy;
+            // Greedy nearest-neighbor through diamonds
+            uint visited = 0;
+            int remaining = _diamondBufferCount;
+            
+            while (remaining > 0) {
+                int minDist = int.MaxValue;
+                int closestIdx = -1;
+                
+                for (int i = 0; i < _diamondBufferCount; i++) {
+                    if ((visited & (1u << i)) != 0) continue;
+                    
+                    int dx = Math.Abs(x - _diamondBuffer[i].X);
+                    int dy = Math.Abs(y - _diamondBuffer[i].Y);
+                    int dist = dx + dy;
+                    
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestIdx = i;
                     }
                 }
-                if (m != int.MaxValue) {
-                    d += m;
-                    diamonds.Remove(closest);
-                    x = closest.X;
-                    y = closest.Y;
+                
+                if (closestIdx >= 0) {
+                    d += minDist;
+                    visited |= (1u << closestIdx);
+                    x = _diamondBuffer[closestIdx].X;
+                    y = _diamondBuffer[closestIdx].Y;
+                    remaining--;
+                } else {
+                    break;
                 }
             }
             
-            dx = Math.Abs(x - node.ExitX);
-            dy = Math.Abs(y - node.ExitY);
-            d += dx + dy;
+            int exitDx = Math.Abs(x - node.ExitX);
+            int exitDy = Math.Abs(y - node.ExitY);
+            d += exitDx + exitDy;
             
             return (int)Math.Floor(d * ratio);
         }
+        
         private int Cost(Board from, Board next) {
-            if (Array.Find(next.Data, x => x != null && x.Details == Element.Player) != null)
-                return 1;
+            int totalElements = next.Data.Length;
+            for (int i = 0; i < totalElements; i++) {
+                Element e = next.Data[i];
+                if (e != null && e.Details == Element.Player)
+                    return 1;
+            }
             return 10000;
         }
 
         private int Search(Solution solution, int gcost, DateTime? tryUntil, float ratio = 1f) {
-            if (tryUntil.HasValue) {
-                if (tryUntil.Value <= DateTime.Now) 
-                    return TIMEDOUT;
-            }
-            if (IsCanceled) return CANCELED;            
+            if (tryUntil.HasValue && tryUntil.Value <= DateTime.Now) 
+                return TIMEDOUT;
+            
+            if (IsCanceled) return CANCELED;
+            
             Board node = solution.Path[solution.Path.Count - 1];
             int fcost = gcost + Heuristic(node, ratio);
+            
             if (fcost > solution.Bound) return fcost;
             if (IsGoal(node)) return FOUND;
+            
             int min = NOT_FOUND;
-            List<Board> successors = new List<Board>();
-            node.FoldSuccessors(successors);
-            foreach (Board board in successors) {
-                if (!BoardOnPath(board, solution.Path)) {
-                    //Console.Clear();
-                    //board.Dump();
+            
+            _successorBuffer.Clear();
+            node.FoldSuccessors(_successorBuffer);
+            
+            ulong nodeHash = node.FNV1aHash();
+            
+            for (int i = 0; i < _successorBuffer.Count; i++) {
+                Board board = _successorBuffer[i];
+                ulong boardHash = board.FNV1aHash();
+                
+                if (!_pathHashes.Contains(boardHash)) {
                     solution.Path.Add(board);
+                    _pathHashes.Add(boardHash);
+                    
                     int t = Search(solution, gcost + Cost(node, board), tryUntil, ratio);
+                    
                     if (t == FOUND) return FOUND;
-                    if (t == TIMEDOUT) 
-                        return TIMEDOUT;
+                    if (t == TIMEDOUT) return TIMEDOUT;
                     if (t == CANCELED) return CANCELED;
                     if (t < min) min = t;
-                    solution.Path.Remove(board);
+                    
+                    solution.Path.RemoveAt(solution.Path.Count - 1);
+                    _pathHashes.Remove(boardHash);
                 }
             }
+            
             return min;
         }
+        
         private bool IsGoal(Board node) {
-            // Early exit: check if any diamonds exist using Array.Exists (faster than Array.Find)
-            if (!Array.Exists(node.Data, x => x != null && x.Details == Element.Diamond)) {
-                bool onExit = false;
-                int totalElements = node.RowCount * node.ColCount;
+            int totalElements = node.Data.Length;
+            bool hasDiamond = false;
+            
+            for (int i = 0; i < totalElements; i++) {
+                Element e = node.Data[i];
+                if (e != null && e.Details == Element.Diamond) {
+                    hasDiamond = true;
+                    break;
+                }
+            }
+            
+            if (!hasDiamond) {
                 for (int i = 0; i < totalElements; i++) {
                     Element e = node.Data[i];
-                    if (e == null) continue;
-                    if (e.Details == Element.Player) {
+                    if (e != null && e.Details == Element.Player) {
                         int col = i % node.ColCount;
                         int row = i / node.ColCount;
-                        if (col == node.ExitX && row == node.ExitY) onExit = true;
+                        return col == node.ExitX && row == node.ExitY;
                     }
                 }
-                return onExit;
             }
+            
             return false;
         }
+        
         private bool BoardOnPath(Board board, List<Board> path) {
-            // Optimize: Use hash comparison first if available
             ulong boardHash = board.FNV1aHash();
-            foreach (Board b in path) {
-                ulong pathHash = b.FNV1aHash();
-                if (boardHash == pathHash && b.Compare(board)) return true;
-            }
-            return false;
+            return _pathHashes.Contains(boardHash);
         }
     }
 }
