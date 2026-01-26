@@ -8,12 +8,6 @@
     <None Remove="Minerush.xml" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="GenDashDB.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      <SubType>Designer</SubType>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
   <ItemGroup>

@@ -26,33 +26,31 @@ namespace GenDash.Engine
         public void Save(XElement puzzleDb, string filePath)
         {
             string fullPath = Path.ChangeExtension(filePath, FileExtension);
-            
-            using (FileStream fs = new FileStream(fullPath, FileMode.Create, FileAccess.Write))
-            using (BinaryWriter writer = new BinaryWriter(fs, Encoding.UTF8))
+
+            using var fs = new FileStream(fullPath, FileMode.Create, FileAccess.Write);
+            using var writer = new BinaryWriter(fs, Encoding.UTF8);
+            // Write header
+            writer.Write(Encoding.ASCII.GetBytes(MAGIC));
+            writer.Write((byte)0); // null terminator
+            writer.Write(VERSION);
+
+            var boards = puzzleDb.Descendants("Board").ToList();
+            // var rejects = puzzleDb.Descendants("Reject").ToList();
+
+            writer.Write((uint)boards.Count);
+            writer.Write((uint)0);// rejects.Count);
+
+            // Write boards
+            foreach (var board in boards)
             {
-                // Write header
-                writer.Write(Encoding.ASCII.GetBytes(MAGIC));
-                writer.Write((byte)0); // null terminator
-                writer.Write(VERSION);
-
-                var boards = puzzleDb.Descendants("Board").ToList();
-                // var rejects = puzzleDb.Descendants("Reject").ToList();
-
-                writer.Write((uint)boards.Count);
-                writer.Write((uint)0);// rejects.Count);
-
-                // Write boards
-                foreach (var board in boards)
-                {
-                    WriteBoard(writer, board);
-                }
-
-                // Write rejects
-                // foreach (var reject in rejects)
-                // {
-                //     WriteReject(writer, reject);
-                // }
+                WriteBoard(writer, board);
             }
+
+            // Write rejects
+            // foreach (var reject in rejects)
+            // {
+            //     WriteReject(writer, reject);
+            // }
         }
 
         public XElement Load(string filePath)
@@ -64,50 +62,48 @@ namespace GenDash.Engine
                 throw new FileNotFoundException($"Binary database file not found: {fullPath}");
             }
 
-            using (FileStream fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read))
-            using (BinaryReader reader = new BinaryReader(fs, Encoding.UTF8))
+            using var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
+            using var reader = new BinaryReader(fs, Encoding.UTF8);
+            // Read and validate header
+            byte[] magicBytes = reader.ReadBytes(8);
+            string magic = Encoding.ASCII.GetString(magicBytes, 0, 7);
+            if (magic != MAGIC)
             {
-                // Read and validate header
-                byte[] magicBytes = reader.ReadBytes(8);
-                string magic = Encoding.ASCII.GetString(magicBytes, 0, 7);
-                if (magic != MAGIC)
-                {
-                    throw new InvalidDataException($"Invalid binary format: magic bytes mismatch");
-                }
-
-                uint version = reader.ReadUInt32();
-                if (version != VERSION)
-                {
-                    throw new InvalidDataException($"Unsupported binary format version: {version}");
-                }
-
-                uint boardCount = reader.ReadUInt32();
-                uint rejectCount = reader.ReadUInt32();
-
-                XElement puzzleDb = new XElement("GenDash");
-                XElement boardsNode = new XElement("Boards");
-                XElement rejectsNode = new XElement("Rejects");
-
-                // Read boards
-                for (uint i = 0; i < boardCount; i++)
-                {
-                    boardsNode.Add(ReadBoard(reader));
-                }
-
-                // Read rejects
-                for (uint i = 0; i < rejectCount; i++)
-                {
-                    rejectsNode.Add(ReadReject(reader));
-                }
-
-                puzzleDb.Add(boardsNode);
-                puzzleDb.Add(rejectsNode);
-
-                return puzzleDb;
+                throw new InvalidDataException($"Invalid binary format: magic bytes mismatch");
             }
+
+            uint version = reader.ReadUInt32();
+            if (version != VERSION)
+            {
+                throw new InvalidDataException($"Unsupported binary format version: {version}");
+            }
+
+            uint boardCount = reader.ReadUInt32();
+            uint rejectCount = reader.ReadUInt32();
+
+            var puzzleDb = new XElement("GenDash");
+            var boardsNode = new XElement("Boards");
+            var rejectsNode = new XElement("Rejects");
+
+            // Read boards
+            for (uint i = 0; i < boardCount; i++)
+            {
+                boardsNode.Add(ReadBoard(reader));
+            }
+
+            // Read rejects
+            for (uint i = 0; i < rejectCount; i++)
+            {
+                rejectsNode.Add(ReadReject(reader));
+            }
+
+            puzzleDb.Add(boardsNode);
+            puzzleDb.Add(rejectsNode);
+
+            return puzzleDb;
         }
 
-        private void WriteBoard(BinaryWriter writer, XElement board)
+        private static void WriteBoard(BinaryWriter writer, XElement board)
         {
             writer.Write((ulong)board.Element("Hash"));
             writer.Write((byte)(int)board.Element("Width"));
@@ -150,7 +146,7 @@ namespace GenDash.Engine
             }
         }
 
-        private XElement ReadBoard(BinaryReader reader)
+        private static XElement ReadBoard(BinaryReader reader)
         {
             ulong hash = reader.ReadUInt64();
             byte width = reader.ReadByte();
@@ -163,7 +159,7 @@ namespace GenDash.Engine
             int idle = reader.ReadInt32();
             string data = ReadString(reader);
 
-            XElement board = new XElement("Board",
+            var board = new XElement("Board",
                 new XElement("Hash", hash),
                 new XElement("Width", width),
                 new XElement("Height", height),
@@ -187,7 +183,7 @@ namespace GenDash.Engine
                 int proximity = reader.ReadInt32();
                 int score = reader.ReadInt32();
 
-                XElement solution = new XElement("Solution");
+                var solution = new XElement("Solution");
                 solution.SetAttributeValue("AvgDiff", avgDiff);
                 solution.SetAttributeValue("AvgGoals", avgGoals);
                 solution.SetAttributeValue("AvgBefore", avgBefore);
@@ -201,7 +197,7 @@ namespace GenDash.Engine
                 {
                     string move = ReadString(reader);
                     string foldData = ReadString(reader);
-                    XElement fold = new XElement("Fold", foldData);
+                    var fold = new XElement("Fold", foldData);
                     fold.SetAttributeValue("Move", move);
                     solution.Add(fold);
                 }
@@ -212,62 +208,13 @@ namespace GenDash.Engine
             return board;
         }
 
-        private void WriteReject(BinaryWriter writer, XElement reject)
-        {
-            writer.Write((ulong)reject.Element("Hash"));
-            WriteString(writer, (string)reject.Element("Reason"));
-            
-            // Optional fields
-            var width = reject.Element("Width");
-            writer.Write(width != null);
-            if (width != null)
-            {
-                writer.Write((byte)(int)width);
-                writer.Write((byte)(int)reject.Element("Height"));
-                writer.Write((int)reject.Element("StartX"));
-                writer.Write((int)reject.Element("StartY"));
-                writer.Write((int)reject.Element("ExitX"));
-                writer.Write((int)reject.Element("ExitY"));
-                writer.Write((int)reject.Element("Idle"));
-            }
 
-            var data = reject.Element("Data");
-            writer.Write(data != null);
-            if (data != null)
-            {
-                WriteString(writer, (string)data);
-            }
-
-            // Write solution if present (for rejected boards with min score)
-            var solution = reject.Element("Solution");
-            writer.Write(solution != null);
-            if (solution != null)
-            {
-                writer.Write((int)solution.Attribute("AvgDiff"));
-                writer.Write((int)solution.Attribute("AvgGoals"));
-                writer.Write((int)solution.Attribute("AvgBefore"));
-                writer.Write((int)solution.Attribute("AvgAfter"));
-                writer.Write((int)solution.Attribute("FallingDelta"));
-                writer.Write((int)solution.Attribute("Proximity"));
-                writer.Write((int)solution.Attribute("Score"));
-
-                var folds = solution.Elements("Fold").ToList();
-                writer.Write((ushort)folds.Count);
-
-                foreach (var fold in folds)
-                {
-                    WriteString(writer, (string)fold.Attribute("Move"));
-                    WriteString(writer, fold.Value);
-                }
-            }
-        }
-
-        private XElement ReadReject(BinaryReader reader)
+        private static XElement ReadReject(BinaryReader reader)
         {
             ulong hash = reader.ReadUInt64();
             string reason = ReadString(reader);
 
-            XElement reject = new XElement("Reject",
+            var reject = new XElement("Reject",
                 new XElement("Hash", hash),
                 new XElement("Reason", reason)
             );
@@ -310,7 +257,7 @@ namespace GenDash.Engine
                 int proximity = reader.ReadInt32();
                 int score = reader.ReadInt32();
 
-                XElement solution = new XElement("Solution");
+                var solution = new XElement("Solution");
                 solution.SetAttributeValue("AvgDiff", avgDiff);
                 solution.SetAttributeValue("AvgGoals", avgGoals);
                 solution.SetAttributeValue("AvgBefore", avgBefore);
@@ -324,7 +271,7 @@ namespace GenDash.Engine
                 {
                     string move = ReadString(reader);
                     string foldData = ReadString(reader);
-                    XElement fold = new XElement("Fold", foldData);
+                    var fold = new XElement("Fold", foldData);
                     fold.SetAttributeValue("Move", move);
                     solution.Add(fold);
                 }
@@ -335,7 +282,7 @@ namespace GenDash.Engine
             return reject;
         }
 
-        private void WriteString(BinaryWriter writer, string value)
+        private static void WriteString(BinaryWriter writer, string value)
         {
             if (string.IsNullOrEmpty(value))
             {
@@ -349,7 +296,7 @@ namespace GenDash.Engine
             }
         }
 
-        private string ReadString(BinaryReader reader)
+        private static string ReadString(BinaryReader reader)
         {
             ushort length = reader.ReadUInt16();
             if (length == 0)

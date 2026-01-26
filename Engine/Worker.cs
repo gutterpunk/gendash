@@ -23,7 +23,7 @@ namespace GenDash.Engine {
             int idleFold,
             int maxSolutionSeconds) {
 
-            List<ElementDetails> newdna = new List<ElementDetails>();
+            List<ElementDetails> newdna = new();
             PatternData pattern = patterns.ElementAt(rnd.Next(patterns.Count()));
             char[] chrs = pattern.DNA.ToCharArray();
             for (int i = 0; i < chrs.Length; i++) {
@@ -32,9 +32,9 @@ namespace GenDash.Engine {
             }
             ElementDetails[] dna = newdna.ToArray();
 
-            Board board = new Board((byte)rnd.Next(pattern.MinWidth, pattern.MaxWidth), (byte)rnd.Next(pattern.MinHeight, pattern.MaxHeight));
+            Board board = new((byte)rnd.Next(pattern.MinWidth, pattern.MaxWidth), (byte)rnd.Next(pattern.MinHeight, pattern.MaxHeight));
             board.Randomize(rnd, pattern, dna);
-            Board original = new Board(board);
+            Board original = new(board);
             ulong hash = original.FNV1aHash();
             
             if (recordHashes.Contains(hash))
@@ -124,7 +124,7 @@ namespace GenDash.Engine {
 
                 } while (true);
                 if (s != null) {
-                    XElement solution = new XElement("Solution");
+                    XElement solution = new("Solution");
                     int steps = 0;
                     Board prev = null;
                     int len = s.Path[0].Data.Length;                    

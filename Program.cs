@@ -14,12 +14,9 @@ namespace GenDash {
         public string Data { get; set; }
         public string MoveOrder { get; set; }
     }
-    class BoardSolution : Board {
+    class BoardSolution(byte width, byte height, string data) : Board(width, height, data) {
         public List<Fold> Solution { get; set; }
         public int IdleFold { get; set; }
-        public BoardSolution(byte width, byte height, string data) 
-            :base(width, height, data) {
-        }        
     }
     class BoardData {
         public ulong Hash { get; set; }
@@ -41,6 +38,49 @@ namespace GenDash {
             return false;
         }
 
+        /// <summary>
+        /// Merges hashes and rejects from XML database into the loaded puzzledb.
+        /// </summary>
+        private static void MergeHashesFromXml(XElement puzzledb, XElement xmlPuzzledb) {
+            var xmlBoardsByKey = new Dictionary<string, ulong>();
+            foreach (var xmlBoard in xmlPuzzledb.Descendants("Board")) {
+                string key = BuildBoardKey(xmlBoard);
+                ulong hash = (ulong)xmlBoard.Element("Hash");
+                if (!xmlBoardsByKey.ContainsKey(key)) {
+                    xmlBoardsByKey[key] = hash;
+                }
+            }
+            
+            int mergedCount = 0;
+            foreach (var board in puzzledb.Descendants("Board")) {
+                string key = BuildBoardKey(board);
+                if (xmlBoardsByKey.TryGetValue(key, out ulong hash)) {
+                    board.Element("Hash").Value = hash.ToString();
+                    mergedCount++;
+                }
+            }
+            
+            if (mergedCount > 0) {
+                Console.WriteLine($"Merged {mergedCount} hashes from XML");
+            }
+
+            var rejectsNode = puzzledb.Element("Rejects");
+            var xmlRejectsNode = xmlPuzzledb.Element("Rejects");
+            if (rejectsNode != null && xmlRejectsNode != null && !rejectsNode.HasElements && xmlRejectsNode.HasElements) {
+                foreach (var reject in xmlRejectsNode.Elements("Reject")) {
+                    rejectsNode.Add(new XElement(reject));
+                }
+                Console.WriteLine($"Merged {rejectsNode.Elements().Count()} rejects from XML");
+            }
+        }
+        
+        private static string BuildBoardKey(XElement board) {
+            return $"{(int)board.Element("Width")}|{(int)board.Element("Height")}|" +
+                   $"{(int)board.Element("StartX")}|{(int)board.Element("StartY")}|" +
+                   $"{(int)board.Element("ExitX")}|{(int)board.Element("ExitY")}|" +
+                   $"{(int)board.Element("Idle")}|{(string)board.Element("Data")}";
+        }
+
         static void Main(string[] args) {
             int seed = int.MaxValue;
             int minMove = 15;
@@ -52,6 +92,7 @@ namespace GenDash {
             string xmlDatabase = "GenDashDB.xml";
             string patternDatabase = null;
             string format = "xml";
+            bool skipGeneration = false;
             ulong playback = 0;
             int playbackSpeed = 200;
             try {
@@ -103,12 +144,18 @@ namespace GenDash {
                     {
                         format = args[++i];
                     }
+                    else
+                    if (args[i].Equals("-convert", StringComparison.OrdinalIgnoreCase))
+                    {
+                        format = args[++i];
+                        skipGeneration = true;
+                    }
                 }
             } catch (Exception e) {
                 Console.WriteLine(e.Message);
                 return;
             }            
-            if (patternDatabase == null) patternDatabase = xmlDatabase;
+            patternDatabase ??= xmlDatabase;
             if (seed == int.MaxValue) seed = DateTime.Now.Millisecond;
             
             IFormatConverter converter;
@@ -124,19 +171,39 @@ namespace GenDash {
             var filepathWithoutExt = Path.Combine(currentDirectory, Path.GetFileNameWithoutExtension(xmlDatabase));
 
             XElement puzzledb;
+            XElement xmlPuzzledb = null;
+            
+            if (File.Exists(filepath)) {
+                try {
+                    xmlPuzzledb = XElement.Load(filepath);
+                    Console.WriteLine($"Loaded hashes from XML: {filepath}");
+                } catch (Exception ex) {
+                    Console.WriteLine($"Warning: Could not load XML for hash preservation: {ex.Message}");
+                }
+            }
+            
             if (File.Exists(Path.ChangeExtension(filepathWithoutExt, converter.FileExtension))) {
                 try {
                     puzzledb = converter.Load(filepathWithoutExt);
                     Console.WriteLine($"Loaded database from {Path.GetFileName(Path.ChangeExtension(filepathWithoutExt, converter.FileExtension))}");
+                    
+                    // Merge hashes from XML if available
+                    if (xmlPuzzledb != null) {
+                        MergeHashesFromXml(puzzledb, xmlPuzzledb);
+                    }
                 } catch (Exception ex) {
                     Console.WriteLine($"Error loading from format: {ex.Message}");
                     Console.WriteLine("Attempting to load from XML...");
-                    if (File.Exists(filepath)) {
+                    if (xmlPuzzledb != null) {
+                        puzzledb = xmlPuzzledb;
+                    } else if (File.Exists(filepath)) {
                         puzzledb = XElement.Load(filepath);
                     } else {
                         puzzledb = new XElement("GenDash");
                     }
                 }
+            } else if (xmlPuzzledb != null) {
+                puzzledb = xmlPuzzledb;
             } else if (File.Exists(filepath)) {
                 puzzledb = XElement.Load(filepath);
             } else {
@@ -150,17 +217,21 @@ namespace GenDash {
             {
                 puzzledb.Add(new XElement("Rejects"));
             }
-            IEnumerable<XElement> boardsNode = puzzledb.Descendants("Boards"); 
-            
-            HashSet<ulong> recordHashes = new HashSet<ulong>(
-                from puzzle in boardsNode.Descendants("Board")
-                select (ulong)puzzle.Element("Hash")
-            );
-            
+            if (skipGeneration)
+            {
+                converter.Save(puzzledb, filepathWithoutExt);
+                Console.WriteLine($"Database converted and saved to {Path.GetFileName(Path.ChangeExtension(filepathWithoutExt, converter.FileExtension))}");
+                return;
+            }
+
+            HashSet<ulong> recordHashes = [.. from puzzle in puzzledb.Descendants("Board")
+                select (ulong)puzzle.Element("Hash")];
+            Console.WriteLine($"Boards loaded from {xmlDatabase} : {recordHashes.Count}");
+
             Console.CursorVisible = false;
             if (playback > 0) {
                 var toPlayback = (
-                    from puzzle in boardsNode.Descendants("Board")
+                    from puzzle in puzzledb.Descendants("Board")  // Changed from boardsNode.Descendants("Board")
                     where (ulong)puzzle.Element("Hash") == playback
                     select new BoardSolution((byte)(int)puzzle.Element("Width"), (byte)(int)puzzle.Element("Height"), (string)puzzle.Element("Data")) {
                         StartX = (int)puzzle.Element("StartX"),
@@ -168,13 +239,12 @@ namespace GenDash {
                         ExitX = (int)puzzle.Element("ExitX"),
                         ExitY = (int)puzzle.Element("ExitX"),
                         IdleFold = (int)puzzle.Element("Idle"),
-                        Solution = puzzle.Element("Solution").Elements("Fold")
+                        Solution = [.. puzzle.Element("Solution").Elements("Fold")
                             .Select(p => new Fold {
                                 Move = (string)p.Attribute("Move"),
                                 Data = p.Value,
                                 MoveOrder = (string)p.Attribute("MoveOrder"),     
-                            })
-                            .ToList()
+                            })]
                     }).FirstOrDefault();
                 if (toPlayback != null) {
                     Console.Clear();
@@ -211,12 +281,10 @@ namespace GenDash {
                 return;
             }
 
-            HashSet<ulong> rejectHashes = new HashSet<ulong>(
+            var rejectHashes = new HashSet<ulong>(
                 from puzzle in puzzledb.Descendants("Rejects").Descendants("Reject")
                 select (ulong)puzzle.Element("Hash")
             );
-
-            Console.WriteLine($"Boards loaded from {xmlDatabase} : {recordHashes.Count}");
             XElement patternsdb = puzzledb;
             if (xmlDatabase != patternDatabase) {
                 var pfilepath = Path.Combine(currentDirectory, patternDatabase);
@@ -225,9 +293,9 @@ namespace GenDash {
                 }
                 patternsdb = XElement.Load(pfilepath);
             }
-            IEnumerable<XElement> patternsNode = patternsdb.Descendants("Patterns");
-            List<PatternData> patterns = (
-                from p in patternsNode.Descendants("Pattern")
+            
+            List<PatternData> patterns = [.. (
+                from p in patternsdb.Descendants("Pattern")  // Changed from patternsNode.Descendants("Pattern")
                 select new PatternData() {
                     MinWidth = (int)p.Element("MinWidth"),
                     MinHeight = (int)p.Element("MinHeight"),
@@ -243,7 +311,7 @@ namespace GenDash {
                         Y = (float)p.Element("Exit").Element("Y"),
                     } : null,
                     DNA = (string)p.Element("DNA"),
-                    Commands = (
+                    Commands = [.. (
                         from c in p.Element("Commands").Elements("Command")                        
                         select new PatternCommmand {
                             From = new PointFloat() {
@@ -257,12 +325,12 @@ namespace GenDash {
                             Element = Element.CharToElementDetails(char.Parse(c.Element("Element").Value)),
                             Type = (string)c.Element("Type")
                         }       
-                    ).ToList<PatternCommmand>()
+                    )]
                 }
-            ).ToList<PatternData>();
-            Console.WriteLine($"Patterns loaded from {patternDatabase} : {patterns.Count()}");
-            Random rnd = new Random(seed);
-            Dictionary<Task, Worker> tasks = new Dictionary<Task, Worker>();
+            )];
+            Console.WriteLine($"Patterns loaded from {patternDatabase} : {patterns.Count}");
+            Random rnd = new(seed);
+            Dictionary<Task, Worker> tasks = new();
             int cposx = 0;
             int cposy = Console.CursorTop + 1;
             
@@ -271,69 +339,81 @@ namespace GenDash {
             DateTime lastUIUpdate = DateTime.Now;
             int saveIntervalSeconds = 5;
             int uiUpdateIntervalMs = 1000; // Update UI every 1 second instead of 500ms
-            
-            using (CancellationTokenSource source = new CancellationTokenSource()) {
-                do {
-                    while (!Console.KeyAvailable) {
-                        int count = Math.Max(0, cpu - tasks.Keys.Where(x => 
-                            x.Status != TaskStatus.Canceled &&
-                            x.Status != TaskStatus.Faulted &&
-                            x.Status != TaskStatus.RanToCompletion).Count());
-                        
-                        for (int i = 0; i < count; i ++) {
-                            Worker worker = new Worker();
-                            Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, recordHashes, patterns, rejectHashes, saveQueue, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
-                                source.Token);
-                            tasks.Add(t, worker);
-                        }
-                        
-                        if ((DateTime.Now - lastSave).TotalSeconds >= saveIntervalSeconds && saveQueue.Count > 0) {
-                            lock(puzzledb) {
-                                while (saveQueue.TryDequeue(out var action)) {
-                                    action();
-                                }
-                                converter.Save(puzzledb, filepathWithoutExt);
-                            }
-                            lastSave = DateTime.Now;
-                        }
-                        
-                        // Only update UI periodically to reduce overhead
-                        if ((DateTime.Now - lastUIUpdate).TotalMilliseconds >= uiUpdateIntervalMs) {
-                            TrySetCursorPosition(cposx, cposy);
-                            foreach (Task t in tasks.Keys) {
-                                if (t.Status == TaskStatus.Running) {
-                                    var now = DateTime.Now;
-                                    var timeout = (tasks[t].Solver.Timeout - tasks[t].Solver.LastSearch).TotalSeconds;
-                                    var progress = 0;
-                                    if (timeout > 0) {
-                                        progress = (int)Math.Ceiling(((now - tasks[t].Solver.LastSearch).TotalSeconds * 60) / timeout);
-                                        progress = Math.Min(progress, 60); // Cap at 60
-                                    }
-                                    int result = tasks[t].Solver.LastSearchResult;
-                                    string resultStr = result switch {
-                                        Solver.NOT_FOUND => "NF",
-                                        Solver.FOUND => "??",
-                                        _ => result.ToString()
-                                    };
-                                    Console.WriteLine($"{t.Id,4} [{"".PadRight(progress, '█').PadRight(60)}] {resultStr} / {tasks[t].Solver.Tries}".PadRight(80));
-                                }
-                            }
-                            lastUIUpdate = DateTime.Now;
-                        }
-                        
-                        Thread.Sleep(100); // Reduced from 500ms to 100ms
+
+            using CancellationTokenSource source = new();
+            do
+            {
+                while (!Console.KeyAvailable)
+                {
+                    int count = Math.Max(0, cpu - tasks.Keys.Where(x =>
+                        x.Status != TaskStatus.Canceled &&
+                        x.Status != TaskStatus.Faulted &&
+                        x.Status != TaskStatus.RanToCompletion).Count());
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        Worker worker = new();
+                        Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, recordHashes, patterns, rejectHashes, saveQueue, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
+                            source.Token);
+                        tasks.Add(t, worker);
                     }
-                } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
-                
-                lock(puzzledb) {
-                    while (saveQueue.TryDequeue(out var action)) {
-                        action();
+
+                    if ((DateTime.Now - lastSave).TotalSeconds >= saveIntervalSeconds && !saveQueue.IsEmpty)
+                    {
+                        lock (puzzledb)
+                        {
+                            while (saveQueue.TryDequeue(out var action))
+                            {
+                                action();
+                            }
+                            converter.Save(puzzledb, filepathWithoutExt);
+                        }
+                        lastSave = DateTime.Now;
                     }
-                    converter.Save(puzzledb, filepathWithoutExt);
+
+                    // Only update UI periodically to reduce overhead
+                    if ((DateTime.Now - lastUIUpdate).TotalMilliseconds >= uiUpdateIntervalMs)
+                    {
+                        TrySetCursorPosition(cposx, cposy);
+                        foreach (Task t in tasks.Keys)
+                        {
+                            if (t.Status == TaskStatus.Running)
+                            {
+                                var now = DateTime.Now;
+                                var timeout = (tasks[t].Solver.Timeout - tasks[t].Solver.LastSearch).TotalSeconds;
+                                var progress = 0;
+                                if (timeout > 0)
+                                {
+                                    progress = (int)Math.Ceiling(((now - tasks[t].Solver.LastSearch).TotalSeconds * 60) / timeout);
+                                    progress = Math.Min(progress, 60); // Cap at 60
+                                }
+                                int result = tasks[t].Solver.LastSearchResult;
+                                string resultStr = result switch
+                                {
+                                    Solver.NOT_FOUND => "NF",
+                                    Solver.FOUND => "??",
+                                    _ => result.ToString()
+                                };
+                                Console.WriteLine($"{t.Id,4} [{"".PadRight(progress, '█'),-60}] {resultStr} / {tasks[t].Solver.Tries}".PadRight(80));
+                            }
+                        }
+                        lastUIUpdate = DateTime.Now;
+                    }
+
+                    Thread.Sleep(100); // Reduced from 500ms to 100ms
                 }
-                
-                source.Cancel();
+            } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
+
+            lock (puzzledb)
+            {
+                while (saveQueue.TryDequeue(out var action))
+                {
+                    action();
+                }
+                converter.Save(puzzledb, filepathWithoutExt);
             }
+
+            source.Cancel();
         }
     }
 }

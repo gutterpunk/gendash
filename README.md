@@ -37,7 +37,7 @@ Usage:
 |:--------------|:--------------------------------------------------------|
 |-patterns      |Room patterns file                                       |
 |-database      |Database file name (default: GenDashDB.xml)              |
-|-format        |Output format: xml, binary (default: xml)                |
+|-format        |Output format: xml, binary, retro (default: xml)         |
 |-playback      |Hash of a cave in the database to display                |
 |-playspeed     |Playback speed                                           |
 |-seed          |Seed that controls the generationof the cave's seeds     |

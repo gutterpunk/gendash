@@ -4,12 +4,12 @@ using System.Collections.Generic;
 
 namespace GenDash.Engine {
     public class Solution {
-        public List<Board> Path { get; set; } = new List<Board>();
+        public List<Board> Path { get; set; } = [];
         public int Bound { get; set; }
     }
     public class Solver {
-        private readonly List<Board> _successorBuffer = new List<Board>(9);
-        private readonly HashSet<ulong> _pathHashes = new HashSet<ulong>();
+        private readonly List<Board> _successorBuffer = new(9);
+        private readonly HashSet<ulong> _pathHashes = [];
         private readonly Point[] _diamondBuffer = new Point[32];
         private int _diamondBufferCount = 0;
         
@@ -30,7 +30,8 @@ namespace GenDash.Engine {
         }
         
         public Solution Solve(int Id, Board root, TimeSpan delay, int maxcost = int.MaxValue, float ratio = 1f) {
-            Solution solution = new Solution {
+            Solution solution = new()
+            {
                 Path = { root },
                 Bound = Heuristic(root, ratio)
             };
@@ -129,7 +130,7 @@ namespace GenDash.Engine {
             return (int)Math.Floor(d * ratio);
         }
         
-        private int Cost(Board from, Board next) {
+        private static int Cost(Board from, Board next) {
             int totalElements = next.Data.Length;
             for (int i = 0; i < totalElements; i++) {
                 Element e = next.Data[i];
@@ -145,7 +146,7 @@ namespace GenDash.Engine {
             
             if (IsCanceled) return CANCELED;
             
-            Board node = solution.Path[solution.Path.Count - 1];
+            Board node = solution.Path[^1];
             int fcost = gcost + Heuristic(node, ratio);
             
             if (fcost > solution.Bound) return fcost;
@@ -155,9 +156,7 @@ namespace GenDash.Engine {
             
             _successorBuffer.Clear();
             node.FoldSuccessors(_successorBuffer);
-            
-            ulong nodeHash = node.FNV1aHash();
-            
+                        
             for (int i = 0; i < _successorBuffer.Count; i++) {
                 Board board = _successorBuffer[i];
                 ulong boardHash = board.FNV1aHash();
@@ -181,7 +180,7 @@ namespace GenDash.Engine {
             return min;
         }
         
-        private bool IsGoal(Board node) {
+        private static bool IsGoal(Board node) {
             int totalElements = node.Data.Length;
             bool hasDiamond = false;
             
@@ -205,11 +204,6 @@ namespace GenDash.Engine {
             }
             
             return false;
-        }
-        
-        private bool BoardOnPath(Board board, List<Board> path) {
-            ulong boardHash = board.FNV1aHash();
-            return _pathHashes.Contains(boardHash);
-        }
+        }      
     }
 }

@@ -8,11 +8,11 @@ namespace GenDash.Engine
         public int DirY { get; set; }
     }
     public static class DirectionType {
-        public static Direction Undefined = new Direction { DirX = 0, DirY = 0 };
-        public static Direction Up = new Direction { DirX = 0, DirY = -1 };
-        public static Direction Down = new Direction { DirX = 0, DirY = 1 };
-        public static Direction Left = new Direction { DirX = -1, DirY = 0 };
-        public static Direction Right = new Direction { DirX = 1, DirY = 0 };
+        public static readonly Direction Undefined = new() { DirX = 0, DirY = 0 };
+        public static readonly Direction Up = new() { DirX = 0, DirY = -1 };
+        public static readonly Direction Down = new() { DirX = 0, DirY = 1 };
+        public static readonly Direction Left = new() { DirX = -1, DirY = 0 };
+        public static readonly Direction Right = new() { DirX = 1, DirY = 0 };
 
         public static Direction ToLeft(Direction direction) {
             if (direction.DirX == Up.DirX && direction.DirY == Up.DirY) return Left;
@@ -49,15 +49,16 @@ namespace GenDash.Engine
         public Direction StartFacing { get; set; } = DirectionType.Undefined;
     }
     public class Element {
-        public static ElementDetails Player = new ElementDetails { Symbols = { { DirectionType.Undefined, '@' } }, Explosion = ExplosionType.Explode };
-        public static ElementDetails Space = new ElementDetails { Symbols = { { DirectionType.Undefined, '.' } } };
-        public static ElementDetails Dirt = new ElementDetails { Symbols = { { DirectionType.Undefined, '*' } } };
-        public static ElementDetails Boulder = new ElementDetails { Symbols = { { DirectionType.Undefined, '0' } }, Rounded = true };
-        public static ElementDetails Diamond = new ElementDetails { Symbols = { { DirectionType.Undefined, 'd' } }, Rounded = true };
-        public static ElementDetails Bricks = new ElementDetails { Symbols = { { DirectionType.Undefined, '#' } }, Rounded = true };
-        public static ElementDetails Steel = new ElementDetails { Symbols = { { DirectionType.Undefined, '%' } }, Indestructible = true };
+        public static readonly ElementDetails Player = new() { Symbols = { { DirectionType.Undefined, '@' } }, Explosion = ExplosionType.Explode };
+        public static readonly ElementDetails Space = new() { Symbols = { { DirectionType.Undefined, '.' } } };
+        public static readonly ElementDetails Dirt = new() { Symbols = { { DirectionType.Undefined, '*' } } };
+        public static readonly ElementDetails Boulder = new() { Symbols = { { DirectionType.Undefined, '0' } }, Rounded = true };
+        public static readonly ElementDetails Diamond = new() { Symbols = { { DirectionType.Undefined, 'd' } }, Rounded = true };
+        public static readonly ElementDetails Bricks = new() { Symbols = { { DirectionType.Undefined, '#' } }, Rounded = true };
+        public static readonly ElementDetails Steel = new() { Symbols = { { DirectionType.Undefined, '%' } }, Indestructible = true };
 
-        public static ElementDetails Firefly = new ElementDetails {
+        public static readonly ElementDetails Firefly = new()
+        {
             Symbols = {
                 { DirectionType.Up, '^' },
                 { DirectionType.Left, '<' },
@@ -70,7 +71,8 @@ namespace GenDash.Engine
             Explosion = ExplosionType.ExplodeToDiamond
         };
 
-        public static ElementDetails Butterfly = new ElementDetails {
+        public static readonly ElementDetails Butterfly = new()
+        {
             Symbols = {
                 { DirectionType.Up, 'M' },
                 { DirectionType.Left, 'E' },
@@ -83,17 +85,17 @@ namespace GenDash.Engine
             Explosion = ExplosionType.Explode
         };
 
-        public static ElementDetails Explosion0 = new ElementDetails { Symbols = { { DirectionType.Undefined, '5' } } };
-        public static ElementDetails Explosion1 = new ElementDetails { Symbols = { { DirectionType.Undefined, '6' } } };
-        public static ElementDetails Explosion2 = new ElementDetails { Symbols = { { DirectionType.Undefined, '7' } } };
-        public static ElementDetails Explosion3 = new ElementDetails { Symbols = { { DirectionType.Undefined, '8' } } };
-        public static ElementDetails Explosion4 = new ElementDetails { Symbols = { { DirectionType.Undefined, '9' } } };
+        public static readonly ElementDetails Explosion0 = new() { Symbols = { { DirectionType.Undefined, '5' } } };
+        public static readonly ElementDetails Explosion1 = new() { Symbols = { { DirectionType.Undefined, '6' } } };
+        public static readonly ElementDetails Explosion2 = new() { Symbols = { { DirectionType.Undefined, '7' } } };
+        public static readonly ElementDetails Explosion3 = new() { Symbols = { { DirectionType.Undefined, '8' } } };
+        public static readonly ElementDetails Explosion4 = new() { Symbols = { { DirectionType.Undefined, '9' } } };
 
-        public static ElementDetails ExplosionToDiamond0 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'Y' } } };
-        public static ElementDetails ExplosionToDiamond1 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'U' } } };
-        public static ElementDetails ExplosionToDiamond2 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'I' } } };
-        public static ElementDetails ExplosionToDiamond3 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'P' } } };
-        public static ElementDetails ExplosionToDiamond4 = new ElementDetails { Symbols = { { DirectionType.Undefined, 'T' } } };
+        public static readonly ElementDetails ExplosionToDiamond0 = new() { Symbols = { { DirectionType.Undefined, 'Y' } } };
+        public static readonly ElementDetails ExplosionToDiamond1 = new() { Symbols = { { DirectionType.Undefined, 'U' } } };
+        public static readonly ElementDetails ExplosionToDiamond2 = new() { Symbols = { { DirectionType.Undefined, 'I' } } };
+        public static readonly ElementDetails ExplosionToDiamond3 = new() { Symbols = { { DirectionType.Undefined, 'P' } } };
+        public static readonly ElementDetails ExplosionToDiamond4 = new() { Symbols = { { DirectionType.Undefined, 'T' } } };
 
         private static int IdCounter;
         public int Id { get; }
@@ -116,54 +118,47 @@ namespace GenDash.Engine
             Look = direction;
         }
         public static ElementDetails CharToElementDetails(char chr) {
-            switch (chr)
+            return chr switch
             {
-                case '@': return Player;
-                case '.': return Space;
-                case '*': return Dirt;
-                case '#': return Bricks; 
-                case '0': return Boulder;
-                case 'd': return Diamond;
-                case '%': return Steel; 
-                case '^': 
-                case '<': 
-                case 'v': 
-                case '>': return Firefly;
-                case 'M':
-                case 'E':
-                case 'W':
-                case '3': return Butterfly;
-                case '5': return Explosion0;
-                case '6': return Explosion1;
-                case '7': return Explosion2;
-                case '8': return Explosion3;
-                case '9': return Explosion4;
-                case 'Y': return ExplosionToDiamond0;
-                case 'U': return ExplosionToDiamond1;
-                case 'I': return ExplosionToDiamond2;
-                case 'P': return ExplosionToDiamond3;
-                case 'T': return ExplosionToDiamond4;
-            }
-            return Steel;
+                '@' => Player,
+                '.' => Space,
+                '*' => Dirt,
+                '#' => Bricks,
+                '0' => Boulder,
+                'd' => Diamond,
+                '%' => Steel,
+                '^' or '<' or 'v' or '>' => Firefly,
+                'M' or 'E' or 'W' or '3' => Butterfly,
+                '5' => Explosion0,
+                '6' => Explosion1,
+                '7' => Explosion2,
+                '8' => Explosion3,
+                '9' => Explosion4,
+                'Y' => ExplosionToDiamond0,
+                'U' => ExplosionToDiamond1,
+                'I' => ExplosionToDiamond2,
+                'P' => ExplosionToDiamond3,
+                'T' => ExplosionToDiamond4,
+                _ => Steel,
+            };
         }
         public static Direction CharToFacing(char chr) {
-            switch (chr)
+            return chr switch
             {
-                case '^': return DirectionType.Up;
-                case '<': return DirectionType.Left;
-                case 'v': return DirectionType.Down; 
-                case '>': return DirectionType.Right;
-                case 'M': return DirectionType.Up;
-                case 'E': return DirectionType.Left;
-                case 'W': return DirectionType.Down;
-                case '3': return DirectionType.Right;
-                default:
-                    return DirectionType.Undefined;
-            }
+                '^' => DirectionType.Up,
+                '<' => DirectionType.Left,
+                'v' => DirectionType.Down,
+                '>' => DirectionType.Right,
+                'M' => DirectionType.Up,
+                'E' => DirectionType.Left,
+                'W' => DirectionType.Down,
+                '3' => DirectionType.Right,
+                _ => DirectionType.Undefined,
+            };
         }
 
         public static bool ExplodeSingle(Board board, int row, int col, int fromRow, int fromCol, bool toDiamond) {
-            Element element = board.GetElementAt(row, col);
+            var element = board.GetElementAt(row, col);
             if (element == null || element.Details.Indestructible) return false;
             var fromIndex = fromRow * board.ColCount + fromCol;
             var index = row * board.ColCount + col;
@@ -256,7 +251,7 @@ namespace GenDash.Engine
             return moved;
         }
         private static bool FoldPlayer(Board board, Element element, int row, int col) {
-            Element dest = board.GetElementAt(row + board.InputY, col + board.InputX);
+            var dest = board.GetElementAt(row + board.InputY, col + board.InputX);
             if (row + board.InputY == board.ExitY && col + board.InputX == board.ExitX)
                 if (Array.Find(board.Data, x => x != null && x.Details == Diamond) == null) 
                     dest = new Element(Space);
@@ -273,7 +268,7 @@ namespace GenDash.Engine
                 return true; //NTS: "move was consumed", even if it didn't work in the case of grabbing a space/wall
             } else {
                 if (board.InputX != 0 && dest.Details == Boulder && !dest.Falling) {
-                    Element behind = board.GetElementAt(row, col + board.InputX * 2);
+                    var behind = board.GetElementAt(row, col + board.InputX * 2);
                     if (behind == null || behind.Details == Space) {
                         if (board.Grabbing) {
                             board.Place(dest, row, col + board.InputX * 2);
@@ -305,7 +300,7 @@ namespace GenDash.Engine
         }
         private static bool FoldFallingMoving(Board board, int row, int col, Element element, bool leftFirst = true) {
             element.Scanned = true;
-            Element under = board.GetElementAt(row + 1, col);
+            var under = board.GetElementAt(row + 1, col);
             if (under == null || under.Details == Space) {
                 element.Falling = true;
                 board.Place(under, row, col);
@@ -313,7 +308,7 @@ namespace GenDash.Engine
                 return true;
             } else {
                 if (under.Details.Rounded && !under.Falling) {
-                    Element beside = leftFirst ? board.GetElementAt(row, col - 1) : board.GetElementAt(row, col + 1);
+                    var beside = leftFirst ? board.GetElementAt(row, col - 1) : board.GetElementAt(row, col + 1);
                     under = leftFirst ? board.GetElementAt(row + 1, col - 1) : board.GetElementAt(row + 1, col + 1);
                     if ((under == null || under.Details == Space) &&
                         (beside == null || beside.Details == Space)) {
@@ -345,11 +340,10 @@ namespace GenDash.Engine
                     return true;
                 }
             }
-            return false;
         }
         private static bool FoldMoving(Board board, int row, int col, Element element, bool leftFirst = true) {
             element.Scanned = true;
-            Element under = board.GetElementAt(row + 1, col);
+            var under = board.GetElementAt(row + 1, col);
             if (under == null || under.Details == Space) {
                 element.Falling = true;
                 board.Place(under, row, col);
@@ -357,7 +351,7 @@ namespace GenDash.Engine
                 return true;
             } else {
                 if (under.Details.Rounded && !under.Falling) {
-                    Element beside = leftFirst ? board.GetElementAt(row, col - 1) : board.GetElementAt(row, col + 1);
+                    var beside = leftFirst ? board.GetElementAt(row, col - 1) : board.GetElementAt(row, col + 1);
                     under = leftFirst ? board.GetElementAt(row + 1, col - 1) : board.GetElementAt(row + 1, col + 1);
                     if ((under == null || under.Details == Space) &&
                         (beside == null || beside.Details == Space)) {
@@ -390,7 +384,7 @@ namespace GenDash.Engine
             return FoldWallFollower(board, element, row, col, false);
         }
         private static bool FoldWallFollower(Board board, Element element, int row, int col, bool leftFirst) {
-            Element beside = board.GetElementAt(row - 1, col);
+            var beside = board.GetElementAt(row - 1, col);
             bool explode = beside != null && beside.Details == Player;
             if (!explode) {
                 beside = board.GetElementAt(row, col - 1);

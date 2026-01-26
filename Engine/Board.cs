@@ -6,16 +6,7 @@ using System.Text;
 
 namespace GenDash.Engine {
    
-    public class FoldMovement {
-        public FoldMovement(Element element, int fromRow, int fromCol, int toRow, int toCol) {
-
-        }
-    }
     public class Board {
-        private static readonly ulong fnvOffset = 14695981039346656037;
-        private static readonly ulong fnvPrime = 1099511628211;
-
-        // Cache hash to avoid recalculation
         private ulong? _cachedHash = null;
 
         public Board Previous { get; set; }
@@ -32,8 +23,7 @@ namespace GenDash.Engine {
         public byte ColCount { get; }
         public Element[] Data { get; }
 
-        private readonly Element borderElement = new Element(Element.Steel);
-        private List<FoldMovement> movements = new List<FoldMovement>();        
+        private readonly Element borderElement = new(Element.Steel);
 
         public Board(byte width, byte height) {
             RowCount = height;
@@ -47,12 +37,14 @@ namespace GenDash.Engine {
             char[] carray = data.ToCharArray();
             for (int i = 0; i < RowCount; i++)
                 for (int j = 0; j < ColCount; j++) {
-                    ElementDetails details = Element.CharToElementDetails(carray[i * ColCount + j]);
-                    Direction dir = Element.CharToFacing(carray[i * ColCount + j]);
-                    Element e = new Element(details, dir);
+                    var details = Element.CharToElementDetails(carray[i * ColCount + j]);
+                    var dir = Element.CharToFacing(carray[i * ColCount + j]);
+                    var e = new Element(details, dir);
                     if (e == null) continue;
-                    Data[i * ColCount + j] = new Element(e.Details);
-                    Data[i * ColCount + j].Look = e.Look;
+                    Data[i * ColCount + j] = new(e.Details)
+                    {
+                        Look = e.Look
+                    };
                 }            
         }
         public Board(Board clone) {
@@ -63,9 +55,11 @@ namespace GenDash.Engine {
                 for (int j = 0; j < ColCount; j++) {
                     Element e = clone.Data[i * ColCount + j];
                     if (e == null) continue;
-                    Data[i * ColCount + j] = new Element(e.Details);
-                    Data[i * ColCount + j].Look = e.Look;
-                    Data[i * ColCount + j].Falling = e.Falling;
+                    Data[i * ColCount + j] = new Element(e.Details)
+                    {
+                        Look = e.Look,
+                        Falling = e.Falling
+                    };
                 }
             ExitX = clone.ExitX;
             ExitY = clone.ExitY;
@@ -73,7 +67,7 @@ namespace GenDash.Engine {
             StartY = clone.StartY;
         }
         public string NameMove() {
-            StringBuilder moveName = new StringBuilder();
+            var moveName = new StringBuilder();
             if (Grabbing) moveName.Append("Grab");
             if (InputX == -1 && InputY == 0) moveName.Append("Left");
             if (InputX == 1 && InputY == 0) moveName.Append("Right");
@@ -86,7 +80,7 @@ namespace GenDash.Engine {
             Grabbing = false;
             if (move.StartsWith("grab", StringComparison.OrdinalIgnoreCase)) {
                 Grabbing = true;
-                move = move.Substring(4);
+                move = move[4..];
             }
             move = move.ToLowerInvariant();
             InputX = 0;
@@ -103,7 +97,7 @@ namespace GenDash.Engine {
             for (int i = 0; i < RowCount; i++) {
                 for (int j = 0; j < ColCount; j++) {
                     int pick = rnd.Next(nonMobs.Length);
-                    Element element = new Element(nonMobs[pick]);
+                    var element = new Element(nonMobs[pick]);
                     Data[i * ColCount + j] = element;                    
                 }
             }
@@ -114,11 +108,11 @@ namespace GenDash.Engine {
                 do {
                     mx = rnd.Next(ColCount);
                     my = rnd.Next(RowCount);
-                    Element under = GetElementAt(my, mx);
+                    var under = GetElementAt(my, mx);
                     if (under != null && !under.Details.Mob) break;
                 } while (true);
                 int pick = rnd.Next(mobs.Length);
-                Element spawn = new Element(mobs[pick]);
+                var spawn = new Element(mobs[pick]);
                 Place(spawn, my, mx);
             }
             foreach (PatternCommmand command in pattern.Commands) {
@@ -127,7 +121,7 @@ namespace GenDash.Engine {
                 int tx = (int)Math.Round(command.To.X * ColCount);
                 int ty = (int)Math.Round(command.To.Y * RowCount);
 
-                if (command.Type.ToLower() == "line") {
+                if (command.Type.Equals("line", StringComparison.OrdinalIgnoreCase)) {
                     if (ty - fy < tx - fx) {
                         float slopex = ty - fy != 0 ? 1f / (ty - fy) : 0f;
                         float row = fy;
@@ -144,7 +138,7 @@ namespace GenDash.Engine {
                         }
                     }
                 } else {
-                    if (command.Type.ToLower() == "rectangle") {
+                    if (command.Type.Equals("rectangle", StringComparison.OrdinalIgnoreCase)) {
                         for (int i = fx; i < tx; i ++) {
                             Place(new Element(command.Element), fy, i);
                             Place(new Element(command.Element), ty, i);
@@ -265,9 +259,6 @@ namespace GenDash.Engine {
         public void Place(Element element, int row, int col) {
             Data[row * ColCount + col] = element;
         }
-        public void AddMove(FoldMovement movement) {
-            movements.Add(movement);
-        }
 
         public Element GetElementAt(int row, int col) {
             if (row < 0 || col < 0) return borderElement;
@@ -301,10 +292,10 @@ namespace GenDash.Engine {
 
 
         public void Dump(bool singleLine = false) {
-            StringBuilder b = new StringBuilder();
+            var b = new StringBuilder();
             for (int i = 0; i < RowCount; i++) {
                 for (int j = 0; j < ColCount; j++) {
-                    Element d = Data[i * ColCount + j];
+                    var d = Data[i * ColCount + j];
                     if (d == null) {
                         b.Append(Element.Space.Symbols[DirectionType.Undefined]);
                         continue;
@@ -321,7 +312,7 @@ namespace GenDash.Engine {
     
         }
         public override string ToString() {
-            StringBuilder b = new StringBuilder();
+            var b = new StringBuilder();
             for (int i = 0; i < RowCount; i++) {
                 for (int j = 0; j < ColCount; j++) {
                     Element d = Data[i * ColCount + j];
@@ -340,31 +331,8 @@ namespace GenDash.Engine {
             if (_cachedHash.HasValue)
                 return _cachedHash.Value;
                 
-            ulong hash = fnvOffset;
-            
-            // Hash the dimensions
-            hash ^= ColCount;
-            hash *= fnvPrime;
-            hash ^= RowCount;
-            hash *= fnvPrime;
-            
-            // Hash the board data directly
-            for (int i = 0; i < RowCount * ColCount; i++)
-            {
-                Element d = Data[i];
-                if (d == null)
-                {
-                    hash ^= (byte)'.';
-                }
-                else
-                {
-                    hash ^= (byte)d.Details.Symbols[d.Look];
-                }
-                hash *= fnvPrime;
-            }
-            
-            _cachedHash = hash;
-            return hash;
+            _cachedHash = HashUtility.ComputeFNV1aHash(ColCount, RowCount, ToString());
+            return _cachedHash.Value;
         }
     }
 }

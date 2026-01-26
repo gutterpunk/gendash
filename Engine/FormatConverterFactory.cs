@@ -10,7 +10,7 @@ namespace GenDash.Engine
         /// <summary>
         /// Creates a format converter based on the format name
         /// </summary>
-        /// <param name="format">Format name (xml, binary, bin, gdb)</param>
+        /// <param name="format">Format name (xml, binary, bin, gdb, retro, gdr)</param>
         public static IFormatConverter CreateConverter(string format)
         {
             if (string.IsNullOrEmpty(format))
@@ -18,19 +18,13 @@ namespace GenDash.Engine
                 return new XmlFormatConverter();
             }
 
-            switch (format.ToLowerInvariant())
+            return format.ToLowerInvariant() switch
             {
-                case "xml":
-                    return new XmlFormatConverter();
-                
-                case "binary":
-                case "bin":
-                case "gdb":
-                    return new BinaryFormatConverter();
-                
-                default:
-                    throw new ArgumentException($"Unknown format: {format}. Supported formats: xml, binary");
-            }
+                "xml" => new XmlFormatConverter(),
+                "binary" or "bin" or "gdb" => new BinaryFormatConverter(),
+                "retro" or "gdr" => new RetroFormatConverter(),
+                _ => throw new ArgumentException($"Unknown format: {format}. Supported formats: xml, binary, retro"),
+            };
         }
 
         /// <summary>
