@@ -1,7 +1,8 @@
-﻿using System;
+﻿using GenDash.Models;
+using System;
 using System.Collections.Generic;
 
-namespace GenDash {
+namespace GenDash.Engine {
     public class Solution {
         public List<Board> Path { get; set; } = new List<Board>();
         public int Bound { get; set; }
@@ -61,17 +62,20 @@ namespace GenDash {
             int x = -1;
             int y = -1;
             List<Point> diamonds = new List<Point>();
-            for (int i = 0; i < node.RowCount; i++) {
-                for (int j = 0; j < node.ColCount; j++) {
-                    Element e = node.Data[(i * node.ColCount) + j];
-                    if (e == null) continue;
-                    if (e.Details == Element.Diamond) diamonds.Add(new Point { X = j, Y = i });
-                    if (e.Details == Element.Player) {
-                        x = j;
-                        y = i;
-                    }
+            
+            int totalElements = node.RowCount * node.ColCount;
+            for (int i = 0; i < totalElements; i++) {
+                Element e = node.Data[i];
+                if (e == null) continue;
+                if (e.Details == Element.Diamond) {
+                    diamonds.Add(new Point { X = i % node.ColCount, Y = i / node.ColCount });
+                }
+                if (e.Details == Element.Player) {
+                    x = i % node.ColCount;
+                    y = i / node.ColCount;
                 }
             }
+            
             int dx, dy;
             while (diamonds.Count > 0) {
                 int m = int.MaxValue;
@@ -94,7 +98,7 @@ namespace GenDash {
             
             dx = Math.Abs(x - node.ExitX);
             dy = Math.Abs(y - node.ExitY);
-            d += (dx + dy);
+            d += dx + dy;
             
             return (int)Math.Floor(d * ratio);
         }
@@ -134,15 +138,17 @@ namespace GenDash {
             return min;
         }
         private bool IsGoal(Board node) {
-            if (Array.Find(node.Data, x => x != null && x.Details == Element.Diamond) == null) {
+            // Early exit: check if any diamonds exist using Array.Exists (faster than Array.Find)
+            if (!Array.Exists(node.Data, x => x != null && x.Details == Element.Diamond)) {
                 bool onExit = false;
-                for (int i = 0; i < node.RowCount; i++) {
-                    for (int j = 0; j < node.ColCount; j++) {
-                        Element e = node.Data[(i * node.ColCount) + j];
-                        if (e == null) continue;
-                        if (e.Details == Element.Player) {
-                            if (j == node.ExitX && i == node.ExitY) onExit = true;
-                        }
+                int totalElements = node.RowCount * node.ColCount;
+                for (int i = 0; i < totalElements; i++) {
+                    Element e = node.Data[i];
+                    if (e == null) continue;
+                    if (e.Details == Element.Player) {
+                        int col = i % node.ColCount;
+                        int row = i / node.ColCount;
+                        if (col == node.ExitX && row == node.ExitY) onExit = true;
                     }
                 }
                 return onExit;
@@ -150,8 +156,11 @@ namespace GenDash {
             return false;
         }
         private bool BoardOnPath(Board board, List<Board> path) {
+            // Optimize: Use hash comparison first if available
+            ulong boardHash = board.FNV1aHash();
             foreach (Board b in path) {
-                if (b.Compare(board)) return true;
+                ulong pathHash = b.FNV1aHash();
+                if (boardHash == pathHash && b.Compare(board)) return true;
             }
             return false;
         }

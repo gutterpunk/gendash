@@ -5,7 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Text;
+using GenDash.Engine;
+using GenDash.Models;
 
 namespace GenDash {
     class Fold {
@@ -28,6 +29,17 @@ namespace GenDash {
     }
   
     class Program {
+        private static bool TrySetCursorPosition(int left, int top) {
+            try {
+                if (left >= 0 && left < Console.BufferWidth && top >= 0 && top < Console.BufferHeight) {
+                    Console.SetCursorPosition(left, top);
+                    return true;
+                }
+            } catch {
+                // Silently handle any exceptions
+            }
+            return false;
+        }
 
         static void Main(string[] args) {
             int seed = int.MaxValue;
@@ -114,12 +126,12 @@ namespace GenDash {
                 puzzledb.Add(new XElement("Rejects"));
             }
             IEnumerable<XElement> boardsNode = puzzledb.Descendants("Boards"); 
-            List<BoardData> records = (
+            
+            HashSet<ulong> recordHashes = new HashSet<ulong>(
                 from puzzle in boardsNode.Descendants("Board")
-                select new BoardData() {
-                    Hash = (ulong)puzzle.Element("Hash"),
-                }
-            ).ToList<BoardData>();
+                select (ulong)puzzle.Element("Hash")
+            );
+            
             Console.CursorVisible = false;
             if (playback > 0) {
                 var toPlayback = (
@@ -141,13 +153,13 @@ namespace GenDash {
                     }).FirstOrDefault();
                 if (toPlayback != null) {
                     Console.Clear();
-                    Console.SetCursorPosition(0, 0);                    
+                    TrySetCursorPosition(0, 0);                    
                     Console.Write("Engine");
-                    Console.SetCursorPosition(toPlayback.ColCount + 3, 0);                    
+                    TrySetCursorPosition(toPlayback.ColCount + 3, 0);                    
                     Console.Write("Stored");
                     for (int i = 0; i < toPlayback.IdleFold; i ++) {
                         toPlayback.Fold();
-                        Console.SetCursorPosition(0, 1);                    
+                        TrySetCursorPosition(0, 1);                    
                         toPlayback.Dump();
                         Console.WriteLine($"Idle {toPlayback.IdleFold - i}".PadRight(40));
                         Thread.Sleep(playbackSpeed);
@@ -157,11 +169,11 @@ namespace GenDash {
                     foreach (var s in toPlayback.Solution) {
                         toPlayback.SetMove(s.Move);
                         toPlayback.Fold();
-                        Console.SetCursorPosition(0, 1);                    
+                        TrySetCursorPosition(0, 1);                    
                         toPlayback.Dump();
                         Console.WriteLine();
                         for (int i = 0; i < s.Data.Length; i += toPlayback.ColCount) {
-                            Console.SetCursorPosition(toPlayback.ColCount + 3, (i / toPlayback.ColCount) + 1);                    
+                            TrySetCursorPosition(toPlayback.ColCount + 3, (i / toPlayback.ColCount) + 1);                    
                             Console.Write(s.Data.Substring(i, toPlayback.ColCount));
                         }
                         Console.WriteLine();
@@ -174,14 +186,12 @@ namespace GenDash {
                 return;
             }
 
-            List<RejectData> rejects = (
+            HashSet<ulong> rejectHashes = new HashSet<ulong>(
                 from puzzle in puzzledb.Descendants("Rejects").Descendants("Reject")
-                select new RejectData() {
-                    Hash = (ulong)puzzle.Element("Hash"),
-                }
-            ).ToList<RejectData>();
+                select (ulong)puzzle.Element("Hash")
+            );
 
-            Console.WriteLine($"Boards loaded from {xmlDatabase} : {records.Count()}");
+            Console.WriteLine($"Boards loaded from {xmlDatabase} : {recordHashes.Count}");
             XElement patternsdb = puzzledb;
             if (xmlDatabase != patternDatabase) {
                 var pfilepath = Path.Combine(currentDirectory, patternDatabase);
@@ -230,6 +240,11 @@ namespace GenDash {
             Dictionary<Task, Worker> tasks = new Dictionary<Task, Worker>();
             int cposx = 0;//Console.CursorLeft;
             int cposy = Console.CursorTop + 1;
+            
+            var saveQueue = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+            DateTime lastSave = DateTime.Now;
+            int saveIntervalSeconds = 5; 
+            
             using (CancellationTokenSource source = new CancellationTokenSource()) {
                 do {
                     while (!Console.KeyAvailable) {
@@ -239,11 +254,23 @@ namespace GenDash {
                             x.Status != TaskStatus.RanToCompletion).Count());
                         for (int i = 0; i < count; i ++) {
                             Worker worker = new Worker();
-                            Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, filepath, records, patterns, rejects, maxNoMove, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
+                            Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, filepath, recordHashes, patterns, rejectHashes, saveQueue, maxNoMove, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
                                 source.Token);
                             tasks.Add(t, worker);
                         }
-                        Console.SetCursorPosition(cposx, cposy);
+                        
+                        // Process batched saves
+                        if ((DateTime.Now - lastSave).TotalSeconds >= saveIntervalSeconds && saveQueue.Count > 0) {
+                            lock(puzzledb) {
+                                while (saveQueue.TryDequeue(out var action)) {
+                                    action();
+                                }
+                                puzzledb.Save(filepath);
+                            }
+                            lastSave = DateTime.Now;
+                        }
+                        
+                        TrySetCursorPosition(cposx, cposy);
                         foreach (Task t in tasks.Keys) {
                             int result;
                             string resultStr;
@@ -272,294 +299,17 @@ namespace GenDash {
                         Thread.Sleep(500);       
                     }
                 } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
+                
+                // Final save on exit
+                lock(puzzledb) {
+                    while (saveQueue.TryDequeue(out var action)) {
+                        action();
+                    }
+                    puzzledb.Save(filepath);
+                }
+                
                 source.Cancel();
             }
         }
-    }
-    class Worker {
-        public Solver Solver { get; private set; }
-        public Worker() {
-            Solver = new Solver();
-        }
-        public void Work(int id, Random rnd,
-            XElement puzzledb,
-            string filepath,
-            List<BoardData> records,
-            List<PatternData> patterns,
-            List<RejectData> rejects,
-            int maxNoMove,
-            int minMove,
-            int maxMove,
-            int minScore,
-            int idleFold,
-            int maxSolutionSeconds) {
-
-            List<ElementDetails> newdna = new List<ElementDetails>();
-            PatternData pattern = patterns.ElementAt(rnd.Next(patterns.Count()));
-            char[] chrs = pattern.DNA.ToCharArray();
-            for (int i = 0; i < chrs.Length; i++) {
-                char c = chrs[i];
-                newdna.Add(Element.CharToElementDetails(c));
-            }
-            ElementDetails[] dna = newdna.ToArray();
-
-            Board board = new Board((byte)rnd.Next(pattern.MinWidth, pattern.MaxWidth), (byte)rnd.Next(pattern.MinHeight, pattern.MaxHeight));
-            board.Randomize(rnd, pattern, dna);
-            Board original = new Board(board);
-            ulong hash = original.FNV1aHash();
-            BoardData existing = records.Where(x => x.Hash == hash).FirstOrDefault();
-            if (existing != null)
-            {
-                //Console.WriteLine($"(Task {id}) Board already exists (hash: {hash}).");
-                return;
-            }
-            RejectData rejected = rejects.Where(x => x.Hash == hash).FirstOrDefault();
-            if (rejected != null)
-            {
-                //Console.WriteLine($"(Task {id}) Board already rejected (hash: {hash}).");
-                return;
-            }
-
-            for (int i = 0; i < idleFold; i ++) {
-                board.Fold();
-            }
-            board.Place(new Element(Element.Player), board.StartY, board.StartX);
-
-            //Console.WriteLine($"(Task {id}) Origin:");
-            //original.Dump();
-            //Console.WriteLine($"\n(Task {id}) Idle folded:");
-            //board.Dump();
-            Solution s = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), maxMove, 1f);
-            if (s != null && s.Bound < minMove) {
-                //Console.WriteLine($"(Task {id}) Move under the minimum ({minMove}), discarding.");
-                puzzledb.Element("Rejects").Add(
-                    new XElement("Reject",
-                    new XElement("Hash", hash),
-                    new XElement("Reason", "MinMove")
-                ));
-                lock(puzzledb) {
-                    puzzledb.Save(filepath);
-                }
-                lock(rejects) {
-                    rejects.Add(new RejectData{ 
-                        Hash = hash
-                    });
-                }
-                s = null;
-            } else 
-            if (s == null && Solver.LastSearchResult == Solver.TIMEDOUT) {
-                //Console.WriteLine($"(Task {id}) Timeout, couldn't verify board. Discarding.");
-                puzzledb.Element("Rejects").Add(
-                    new XElement("Reject",
-                    new XElement("Hash", hash),
-                    new XElement("Reason", "Timeout with no solution"),
-                    new XElement("Data", original.ToString())
-                ));
-                lock(puzzledb) {
-                    puzzledb.Save(filepath);
-                }
-                lock(rejects) {
-                    rejects.Add(new RejectData{ 
-                        Hash = hash
-                    });
-                }
-                s = null;
-            } else
-            if (s == null) {
-                //Console.WriteLine($"(Task {id}) No Solution found. Discarding.");
-                puzzledb.Element("Rejects").Add(
-                    new XElement("Reject",
-                    new XElement("Hash", hash),
-                    new XElement("Reason", "Unsolveable")
-                ));
-                lock(puzzledb) {
-                    puzzledb.Save(filepath);
-                }
-                lock(rejects) {
-                    rejects.Add(new RejectData{ 
-                        Hash = hash
-                    });
-                }
-            }
-
-            if (s != null) {
-                //Console.WriteLine($"(Task {id}) Trying to find better solutions.");
-                float first = s.Bound;
-                do
-                {
-                    Solver.Tries ++;
-                    Solution better = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), s.Bound, (s.Bound - 1) / first);                    
-                    if (better != null && better.Bound < s.Bound) {
-                        //Console.WriteLine($"(Task {id}) Better solution found: {better.Bound}");
-                        s = better;
-                        if (s.Bound < minMove) {
-                            //Console.WriteLine($"(Task {id}) Move under the minimum ({minMove}), discarding.");
-                            s = null;
-                            break;
-                        }
-                    } else
-                        if (better == null && Solver.LastSearchResult == Solver.TIMEDOUT) {
-                            //Console.WriteLine($"(Task {id}) Timeout, couldn't verify board. Discarding.");
-                            puzzledb.Element("Rejects").Add(
-                                new XElement("Reject",
-                                new XElement("Hash", hash),
-                                new XElement("Width", original.ColCount),
-                                new XElement("Height", original.RowCount),
-                                new XElement("StartX", original.StartX),
-                                new XElement("StartY", original.StartY),
-                                new XElement("ExitX", original.ExitX),
-                                new XElement("ExitY", original.ExitY),
-                                new XElement("Reason", "Timeout while looking for a better solution"),
-                                new XElement("Idle", idleFold),
-                                new XElement("Data", original.ToString())
-                            ));
-                            lock(puzzledb) {
-                                puzzledb.Save(filepath);
-                            }
-                            lock(rejects) {
-                                rejects.Add(new RejectData{ 
-                                    Hash = hash
-                                });
-                            }                            
-                            s = null;
-                            break;
-                        } else {
-                            //Console.WriteLine($"(Task {id}) No better solution, bailing.");
-                            break;
-                        }
-
-                } while (true);
-                if (s != null) {
-                    XElement solution = new XElement("Solution");
-                    int steps = 0;
-                    Board prev = null;
-                    int len = s.Path[0].Data.Length;                    
-                    int diffTotal = 0;
-                    int goalTotal = 0;
-                    int mobBefore = 0;
-                    int mobAfter = 0;
-                    int fallingDelta = 0;
-                    int proximity = 0;
-                    foreach (Board b in s.Path)
-                    {
-                        var foldStr = b.ToString();
-                        var fold = new XElement("Fold", foldStr);
-                        fold.SetAttributeValue("Move", b.NameMove());
-                        int goals = b.Data.Where(x => x != null && x.Details == Element.Diamond).Count();
-                        //fold.SetAttributeValue("Goals", goals);
-                        goalTotal += goals;
-                        var diffs = 0;
-                        if (prev != null) {
-                            for (int i = 0; i < len; i ++) {
-                                if (prev.Data[i].Details != b.Data[i].Details) diffs++;
-                            }
-                            fallingDelta += prev.Data.Count(x => x.Falling) - b.Data.Count(x => x.Falling);
-                        }
-                        diffTotal += diffs;
-                        //fold.SetAttributeValue("Diffs", diffs);
-                        //var ff = b.Data.Count(x => x.Falling);
-                        //if (ff > 0)
-                        //    fold.SetAttributeValue("Falling", ff);
-                        //fold.SetAttributeValue("Space", b.Data.Count(x => x == null || x.Details == Element.Space));
-                        var moveOrder = new StringBuilder();
-                        Boolean before = true;
-                        for (int i = 0; i < len; i ++) {
-                            var details = b.Data[i].Details;
-                            if (details.Mob) {
-                                if (i > 0 && b.Data[i - 1].Details == Element.Player) proximity ++;
-                                if (i < len - 1 && b.Data[i + 1].Details == Element.Player) proximity ++;
-                                if (i > b.ColCount && b.Data[i - b.ColCount].Details == Element.Player) proximity ++;
-                                if (i < b.ColCount - 1 && b.Data[i + b.ColCount].Details == Element.Player) proximity ++;
-                            }
-                            if (details.Mob || details == Element.Boulder || details == Element.Diamond || details == Element.Player) {
-                                moveOrder.Append(details.Symbols[details.StartFacing]);                                
-                                if (details != Element.Player) {
-                                    if (details.Mob) {
-                                        if (before)
-                                            mobBefore++;
-                                        else 
-                                            mobAfter++;
-                                    }
-                                } else
-                                    before = false;
-                            }
-                        }
-                        //if (proximity > 0)
-                        //    fold.SetAttributeValue("Proximity", proximity);
-                        //fold.SetAttributeValue("MoveOrder", moveOrder.ToString());
-
-                        prev = b;
-                        solution.Add(fold);
-                        steps++;
-                    }
-                    fallingDelta = Math.Max(-10, fallingDelta * -1);                     
-                    int score = ((int)Math.Ceiling((double)diffTotal / (s.Path.Count - 1)) * 10) + ((mobBefore / s.Path.Count) * 5) + ((mobAfter / s.Path.Count) * 2) + (fallingDelta * 5) + len + ((goalTotal / s.Path.Count) * 3) + (proximity * 12);
-                    solution.SetAttributeValue("AvgDiff", (int)Math.Ceiling((double)diffTotal / (s.Path.Count - 1)));
-                    solution.SetAttributeValue("AvgGoals", goalTotal / s.Path.Count);
-                    solution.SetAttributeValue("AvgBefore", (mobBefore / s.Path.Count));
-                    solution.SetAttributeValue("AvgAfter", (mobAfter / s.Path.Count));
-                    solution.SetAttributeValue("FallingDelta", fallingDelta);
-                    solution.SetAttributeValue("Proximity", proximity);
-                    solution.SetAttributeValue("Score", score);
-                    if (score >= minScore)
-                    {
-                        puzzledb.Element("Boards").Add(new XElement("Board",
-                            new XElement("Hash", original.FNV1aHash()),
-                            new XElement("Width", original.ColCount),
-                            new XElement("Height", original.RowCount),
-                            new XElement("Par", steps),
-                            new XElement("StartX", original.StartX),
-                            new XElement("StartY", original.StartY),
-                            new XElement("ExitX", original.ExitX),
-                            new XElement("ExitY", original.ExitY),
-                            new XElement("Idle", idleFold),
-                            new XElement("Data", original.ToString()),
-                            solution
-                        ));
-                        lock (puzzledb)
-                        {
-                            puzzledb.Save(filepath);
-                        }
-                        lock (records)
-                        {
-                            records.Add(new BoardData
-                            {
-                                Hash = hash
-                            });
-                        }
-                    }
-                    else
-                    {
-                        puzzledb.Element("Rejects").Add(
-                               new XElement("Reject",
-                               new XElement("Hash", hash),
-                               new XElement("Width", original.ColCount),
-                               new XElement("Height", original.RowCount),
-                               new XElement("StartX", original.StartX),
-                               new XElement("StartY", original.StartY),
-                               new XElement("ExitX", original.ExitX),
-                               new XElement("ExitY", original.ExitY),
-                               new XElement("Reason", "Min score"),
-                               new XElement("Idle", idleFold),
-                               new XElement("Data", original.ToString()),
-                               solution
-                           ));
-                        lock (puzzledb)
-                        {
-                            puzzledb.Save(filepath);
-                        }
-                        lock (rejects)
-                        {
-                            rejects.Add(new RejectData
-                            {
-                                Hash = hash
-                            });
-                        }
-                    }
-                   // Console.WriteLine($"(Task {id}) Puzzle added to DB");
-                }
-            } 
-        }
-
     }
 }

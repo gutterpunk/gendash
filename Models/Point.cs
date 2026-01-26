@@ -1,9 +1,7 @@
- using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
+using System;
 
-namespace GenDash {
+
+namespace GenDash.Models {
     [Serializable]
     public class Point {
         public int X { get; set; }

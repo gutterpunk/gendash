@@ -1,9 +1,10 @@
-﻿using System;
+﻿using GenDash.Models;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace GenDash {
+namespace GenDash.Engine {
    
     public class FoldMovement {
         public FoldMovement(Element element, int fromRow, int fromCol, int toRow, int toCol) {
@@ -14,6 +15,8 @@ namespace GenDash {
         private static readonly ulong fnvOffset = 14695981039346656037;
         private static readonly ulong fnvPrime = 1099511628211;
 
+        // Cache hash to avoid recalculation
+        private ulong? _cachedHash = null;
 
         public Board Previous { get; set; }
         public Board Head { get; set; }
@@ -44,12 +47,12 @@ namespace GenDash {
             char[] carray = data.ToCharArray();
             for (int i = 0; i < RowCount; i++)
                 for (int j = 0; j < ColCount; j++) {
-                    ElementDetails details = Element.CharToElementDetails(carray[(i * ColCount) + j]);
-                    Direction dir = Element.CharToFacing(carray[(i * ColCount) + j]);
+                    ElementDetails details = Element.CharToElementDetails(carray[i * ColCount + j]);
+                    Direction dir = Element.CharToFacing(carray[i * ColCount + j]);
                     Element e = new Element(details, dir);
                     if (e == null) continue;
-                    Data[(i * ColCount) + j] = new Element(e.Details);
-                    Data[(i * ColCount) + j].Look = e.Look;
+                    Data[i * ColCount + j] = new Element(e.Details);
+                    Data[i * ColCount + j].Look = e.Look;
                 }            
         }
         public Board(Board clone) {
@@ -58,11 +61,11 @@ namespace GenDash {
             Data = new Element[RowCount * ColCount];
             for (int i = 0; i < RowCount; i++)
                 for (int j = 0; j < ColCount; j++) {
-                    Element e = clone.Data[(i * ColCount) + j];
+                    Element e = clone.Data[i * ColCount + j];
                     if (e == null) continue;
-                    Data[(i * ColCount) + j] = new Element(e.Details);
-                    Data[(i * ColCount) + j].Look = e.Look;
-                    Data[(i * ColCount) + j].Falling = e.Falling;
+                    Data[i * ColCount + j] = new Element(e.Details);
+                    Data[i * ColCount + j].Look = e.Look;
+                    Data[i * ColCount + j].Falling = e.Falling;
                 }
             ExitX = clone.ExitX;
             ExitY = clone.ExitY;
@@ -101,11 +104,11 @@ namespace GenDash {
                 for (int j = 0; j < ColCount; j++) {
                     int pick = rnd.Next(nonMobs.Length);
                     Element element = new Element(nonMobs[pick]);
-                    Data[(i * ColCount) + j] = element;                    
+                    Data[i * ColCount + j] = element;                    
                 }
             }
             ElementDetails[] mobs = Array.FindAll(dna, x => x.Mob);
-            int mobCount = (int)Math.Round((RowCount * ColCount) * pattern.MobRatio);
+            int mobCount = (int)Math.Round(RowCount * ColCount * pattern.MobRatio);
             for (int i = 0; i < mobCount; i ++) {
                 int mx, my;
                 do {
@@ -126,15 +129,15 @@ namespace GenDash {
 
                 if (command.Type.ToLower() == "line") {
                     if (ty - fy < tx - fx) {
-                        float slopex = (ty - fy != 0) ? 1f / (float)(ty - fy) : 0f;
-                        float row = (float)fy;
+                        float slopex = ty - fy != 0 ? 1f / (ty - fy) : 0f;
+                        float row = fy;
                         for (int i = fx; i < tx; i ++) {
                             Place(new Element(command.Element), (int)Math.Round(row), i);
                             row += slopex;
                         }
                     } else {
-                        float slopey = (tx - fx != 0) ? 1f / (float)(tx - fx) : 0f;
-                        float col = (float)fx;
+                        float slopey = tx - fx != 0 ? 1f / (tx - fx) : 0f;
+                        float col = fx;
                         for (int i = fy; i < ty; i ++) {
                             Place(new Element(command.Element), i, (int)Math.Round(col));
                             col += slopey;
@@ -231,7 +234,7 @@ namespace GenDash {
         public bool Fold() {
             for (int i = 0; i < RowCount; i++) {
                 for (int j = 0; j < ColCount; j++) {
-                    Element e = Data[(i * ColCount) + j];
+                    Element e = Data[i * ColCount + j];
                     if (e == null) continue;
                     e.Scanned = false;
                 }
@@ -240,7 +243,7 @@ namespace GenDash {
             LastFoldImportant = 0;
             for (int i = 0; i < RowCount; i++) {
                 for (int j = 0; j < ColCount; j++) {
-                    Element e = Data[(i * ColCount) + j];
+                    Element e = Data[i * ColCount + j];
                     if (e == null) continue;
                     if (e.Scanned) continue;
 
@@ -260,7 +263,7 @@ namespace GenDash {
             return !nomove;
         }
         public void Place(Element element, int row, int col) {
-            Data[(row * ColCount) + col] = element;
+            Data[row * ColCount + col] = element;
         }
         public void AddMove(FoldMovement movement) {
             movements.Add(movement);
@@ -270,22 +273,26 @@ namespace GenDash {
             if (row < 0 || col < 0) return borderElement;
             if (row >= RowCount || col >= ColCount) return borderElement;
 
-            return Data[(row * ColCount) + col];
+            return Data[row * ColCount + col];
         }
 
         public bool Compare(Board other) {
             if (other.RowCount != RowCount) return false;
             if (other.ColCount != ColCount) return false;
-            for (int i = 0; i < RowCount; i++) {
-                for (int j = 0; j < ColCount; j++) {
-                    Element e1 = Data[(i * ColCount) + j];
-                    Element e2 = other.Data[(i * ColCount) + j];
-                    if (e1 == null && e2 != null) return false;
-                    if (e1 != null && e2 == null) return false;
-                    if (e1 == null && e2 == null) continue;
-                    if (e1.Details != e2.Details) return false;
-                    if (e1.Falling != e2.Falling) return false;
-                }
+            
+            // Early exit optimization: compare hashes first if both are cached
+            if (_cachedHash.HasValue && other._cachedHash.HasValue && _cachedHash.Value != other._cachedHash.Value)
+                return false;
+            
+            int totalLength = RowCount * ColCount;
+            for (int i = 0; i < totalLength; i++) {
+                Element e1 = Data[i];
+                Element e2 = other.Data[i];
+                if (e1 == null && e2 != null) return false;
+                if (e1 != null && e2 == null) return false;
+                if (e1 == null && e2 == null) continue;
+                if (e1.Details != e2.Details) return false;
+                if (e1.Falling != e2.Falling) return false;
             }
             
             return true;
@@ -297,7 +304,7 @@ namespace GenDash {
             StringBuilder b = new StringBuilder();
             for (int i = 0; i < RowCount; i++) {
                 for (int j = 0; j < ColCount; j++) {
-                    Element d = Data[(i * ColCount) + j];
+                    Element d = Data[i * ColCount + j];
                     if (d == null) {
                         b.Append(Element.Space.Symbols[DirectionType.Undefined]);
                         continue;
@@ -317,7 +324,7 @@ namespace GenDash {
             StringBuilder b = new StringBuilder();
             for (int i = 0; i < RowCount; i++) {
                 for (int j = 0; j < ColCount; j++) {
-                    Element d = Data[(i * ColCount) + j];
+                    Element d = Data[i * ColCount + j];
                     if (d == null) {
                         b.Append(Element.Space.Symbols[DirectionType.Undefined]);
                         continue;
@@ -330,20 +337,33 @@ namespace GenDash {
 
         public ulong FNV1aHash()
         {
+            if (_cachedHash.HasValue)
+                return _cachedHash.Value;
+                
             ulong hash = fnvOffset;
-            using (BinaryWriter writer = new BinaryWriter(new MemoryStream()))
+            
+            // Hash the dimensions
+            hash ^= ColCount;
+            hash *= fnvPrime;
+            hash ^= RowCount;
+            hash *= fnvPrime;
+            
+            // Hash the board data directly
+            for (int i = 0; i < RowCount * ColCount; i++)
             {
-                writer.Write(ColCount);
-                writer.Write(RowCount);
-                writer.Write(Encoding.ASCII.GetBytes(ToString()));
-                writer.BaseStream.Position = 0;
-
-                for (int i = 0; i < writer.BaseStream.Length; i ++)
+                Element d = Data[i];
+                if (d == null)
                 {
-                    hash ^= (byte)writer.BaseStream.ReadByte();
-                    hash *= fnvPrime;
+                    hash ^= (byte)'.';
                 }
+                else
+                {
+                    hash ^= (byte)d.Details.Symbols[d.Look];
+                }
+                hash *= fnvPrime;
             }
+            
+            _cachedHash = hash;
             return hash;
         }
     }

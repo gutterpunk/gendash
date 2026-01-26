@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace GenDash
+namespace GenDash.Engine
 {
     public sealed class Direction {
         public int DirX { get; set; }
@@ -118,33 +118,33 @@ namespace GenDash
         public static ElementDetails CharToElementDetails(char chr) {
             switch (chr)
             {
-                case '@': return Element.Player;
-                case '.': return Element.Space;
-                case '*': return Element.Dirt;
-                case '#': return Element.Bricks; 
-                case '0': return Element.Boulder;
-                case 'd': return Element.Diamond;
-                case '%': return Element.Steel; 
+                case '@': return Player;
+                case '.': return Space;
+                case '*': return Dirt;
+                case '#': return Bricks; 
+                case '0': return Boulder;
+                case 'd': return Diamond;
+                case '%': return Steel; 
                 case '^': 
                 case '<': 
                 case 'v': 
-                case '>': return Element.Firefly;
+                case '>': return Firefly;
                 case 'M':
                 case 'E':
                 case 'W':
-                case '3': return Element.Butterfly;
-                case '5': return Element.Explosion0;
-                case '6': return Element.Explosion1;
-                case '7': return Element.Explosion2;
-                case '8': return Element.Explosion3;
-                case '9': return Element.Explosion4;
-                case 'Y': return Element.ExplosionToDiamond0;
-                case 'U': return Element.ExplosionToDiamond1;
-                case 'I': return Element.ExplosionToDiamond2;
-                case 'P': return Element.ExplosionToDiamond3;
-                case 'T': return Element.ExplosionToDiamond4;
+                case '3': return Butterfly;
+                case '5': return Explosion0;
+                case '6': return Explosion1;
+                case '7': return Explosion2;
+                case '8': return Explosion3;
+                case '9': return Explosion4;
+                case 'Y': return ExplosionToDiamond0;
+                case 'U': return ExplosionToDiamond1;
+                case 'I': return ExplosionToDiamond2;
+                case 'P': return ExplosionToDiamond3;
+                case 'T': return ExplosionToDiamond4;
             }
-            return Element.Steel;
+            return Steel;
         }
         public static Direction CharToFacing(char chr) {
             switch (chr)
@@ -165,17 +165,17 @@ namespace GenDash
         public static bool ExplodeSingle(Board board, int row, int col, int fromRow, int fromCol, bool toDiamond) {
             Element element = board.GetElementAt(row, col);
             if (element == null || element.Details.Indestructible) return false;
-            var fromIndex = (fromRow * board.ColCount) + fromCol;
-            var index = (row * board.ColCount) + col;
+            var fromIndex = fromRow * board.ColCount + fromCol;
+            var index = row * board.ColCount + col;
             var scanned = index <= fromIndex;
             ElementDetails next;
             if (toDiamond)
             {
-                if (scanned) next = Element.ExplosionToDiamond1; else next = Element.ExplosionToDiamond0;
+                if (scanned) next = ExplosionToDiamond1; else next = ExplosionToDiamond0;
             }
             else
             {
-                if (scanned) next = Element.Explosion1; else next = Element.Explosion0;
+                if (scanned) next = Explosion1; else next = Explosion0;
             }
             board.Place(new Element(next) { Scanned = index <= fromIndex }, row, col);
 
@@ -258,8 +258,8 @@ namespace GenDash
         private static bool FoldPlayer(Board board, Element element, int row, int col) {
             Element dest = board.GetElementAt(row + board.InputY, col + board.InputX);
             if (row + board.InputY == board.ExitY && col + board.InputX == board.ExitX)
-                if (Array.Find(board.Data, x => x != null && x.Details == Element.Diamond) == null) 
-                    dest = new Element(Element.Space);
+                if (Array.Find(board.Data, x => x != null && x.Details == Diamond) == null) 
+                    dest = new Element(Space);
             if (dest == null || dest.Details == Space || dest.Details == Dirt || dest.Details == Diamond) {
                 element.Scanned = true;
                 if (board.Grabbing) {
@@ -273,13 +273,13 @@ namespace GenDash
                 return true; //NTS: "move was consumed", even if it didn't work in the case of grabbing a space/wall
             } else {
                 if (board.InputX != 0 && dest.Details == Boulder && !dest.Falling) {
-                    Element behind = board.GetElementAt(row, col + (board.InputX * 2));
+                    Element behind = board.GetElementAt(row, col + board.InputX * 2);
                     if (behind == null || behind.Details == Space) {
                         if (board.Grabbing) {
-                            board.Place(dest, row, col + (board.InputX * 2));
+                            board.Place(dest, row, col + board.InputX * 2);
                             board.Place(new Element(Space), row, col + board.InputX);
                         } else {
-                            board.Place(dest, row, col + (board.InputX * 2));
+                            board.Place(dest, row, col + board.InputX * 2);
                             board.Place(new Element(Space), row, col);
                             board.Place(element, row, col + board.InputX);
                         }
@@ -391,18 +391,18 @@ namespace GenDash
         }
         private static bool FoldWallFollower(Board board, Element element, int row, int col, bool leftFirst) {
             Element beside = board.GetElementAt(row - 1, col);
-            bool explode = beside != null && beside.Details == Element.Player;
+            bool explode = beside != null && beside.Details == Player;
             if (!explode) {
                 beside = board.GetElementAt(row, col - 1);
-                explode = beside != null && beside.Details == Element.Player;
+                explode = beside != null && beside.Details == Player;
             }
             if (!explode) {
                 beside = board.GetElementAt(row + 1, col);
-                explode = beside != null && beside.Details == Element.Player;
+                explode = beside != null && beside.Details == Player;
             }
             if (!explode) {
                 beside = board.GetElementAt(row, col + 1);
-                explode = beside != null && beside.Details == Element.Player;
+                explode = beside != null && beside.Details == Player;
             }
             if (explode) {
                 return Explode(board, row, col, element.Details.Explosion == ExplosionType.ExplodeToDiamond);

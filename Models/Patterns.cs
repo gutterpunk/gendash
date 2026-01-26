@@ -1,9 +1,10 @@
+using GenDash.Engine;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace GenDash {
+namespace GenDash.Models {
    
     [Serializable]
     public class PatternData {
@@ -14,7 +15,7 @@ namespace GenDash {
         public float MobRatio { get; set; }
         public PointFloat Start { get; set; }
         public PointFloat Exit { get; set; }
-        public String DNA { get; set; }
+        public string DNA { get; set; }
         public List<PatternCommmand> Commands { get; set; }
     }  
     [Serializable]
