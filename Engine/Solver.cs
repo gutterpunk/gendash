@@ -21,7 +21,6 @@ namespace GenDash.Engine {
         public int LastSearchResult { get; private set; }
         public DateTime LastSearch { get; private set; }
         public DateTime Timeout { get; private set; }
-        public int Tries { get; set; }
         
         public Solver() {
             for (int i = 0; i < _diamondBuffer.Length; i++) {

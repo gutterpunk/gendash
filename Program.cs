@@ -293,7 +293,11 @@ namespace GenDash {
                 }
                 patternsdb = XElement.Load(pfilepath);
             }
-            
+            if (skipGeneration) {
+                converter.Save(puzzledb, filepathWithoutExt);
+                Console.WriteLine($"Database converted and saved to {Path.GetFileName(Path.ChangeExtension(filepathWithoutExt, converter.FileExtension))}");
+                return;
+            }
             List<PatternData> patterns = [.. (
                 from p in patternsdb.Descendants("Pattern")  // Changed from patternsNode.Descendants("Pattern")
                 select new PatternData() {
@@ -379,28 +383,38 @@ namespace GenDash {
                         {
                             if (t.Status == TaskStatus.Running)
                             {
+                                var worker = tasks[t];
                                 var now = DateTime.Now;
-                                var timeout = (tasks[t].Solver.Timeout - tasks[t].Solver.LastSearch).TotalSeconds;
+                                var timeout = (worker.Solver.Timeout - worker.Solver.LastSearch).TotalSeconds;
                                 var progress = 0;
                                 if (timeout > 0)
                                 {
-                                    progress = (int)Math.Ceiling(((now - tasks[t].Solver.LastSearch).TotalSeconds * 60) / timeout);
-                                    progress = Math.Min(progress, 60); // Cap at 60
+                                    progress = (int)Math.Ceiling(((now - worker.Solver.LastSearch).TotalSeconds * 60) / timeout);
+                                    progress = Math.Min(progress, 60);
                                 }
-                                int result = tasks[t].Solver.LastSearchResult;
+                                
+                                int result = worker.Solver.LastSearchResult;
                                 string resultStr = result switch
                                 {
                                     Solver.NOT_FOUND => "NF",
-                                    Solver.FOUND => "??",
+                                    Solver.FOUND => "OK",
                                     _ => result.ToString()
                                 };
-                                Console.WriteLine($"{t.Id,4} [{"".PadRight(progress, '█'),-60}] {resultStr} / {tasks[t].Solver.Tries}".PadRight(80));
+                                
+                                string size = $"{worker.CurrentBoardWidth}x{worker.CurrentBoardHeight}";
+                                string phase = worker.Phase.PadRight(10);
+                                string stats = $"G:{worker.BoardsGenerated} S:{worker.BoardsSaved} R:{worker.BoardsRejected}";
+                                
+                                Console.WriteLine(
+                                    $"{t.Id,4} [{"".PadRight(progress, '█'),-60}] " +
+                                    $"{resultStr,3} | {phase} | {worker.OptimizeBound}".PadRight(40)
+                                );
                             }
                         }
                         lastUIUpdate = DateTime.Now;
                     }
 
-                    Thread.Sleep(100); // Reduced from 500ms to 100ms
+                    Thread.Sleep(100);
                 }
             } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
 

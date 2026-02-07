@@ -2,8 +2,8 @@
   "profiles": {
     "GenDash": {
       "commandName": "Project",
-      "commandLineArgs": "-seed 42 -minmove 20 -maxmove 50 -patterns Patterns.xml -maxtime 800 -database 80CaveGame.xml -minscore 100 -tasks 16"
-      //"commandLineArgs": "-database 80CaveGame.xml -convert retro"
+      //"commandLineArgs": "-seed 42 -minmove 20 -maxmove 50 -patterns Patterns.xml -maxtime 800 -database 80CaveGame.xml -minscore 100 -tasks 12"
+      "commandLineArgs": "-database 80CaveGame.xml -convert retro"
     }
   }
 }

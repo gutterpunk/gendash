@@ -8,9 +8,18 @@ using GenDash.Models;
 namespace GenDash.Engine {
     internal class Worker {
         public Solver Solver { get; private set; }
+        public string Phase { get; private set; } = "Idle";
+        public int OptimizeBound { get; private set; }
+        public int BoardsGenerated { get; private set; }
+        public int BoardsSaved { get; private set; }
+        public int BoardsRejected { get; private set; }
+        public byte CurrentBoardWidth { get; private set; }
+        public byte CurrentBoardHeight { get; private set; }
+        
         public Worker() {
             Solver = new Solver();
         }
+        
         public void Work(int id, Random rnd,
             XElement puzzledb,
             HashSet<ulong> recordHashes,
@@ -23,6 +32,9 @@ namespace GenDash.Engine {
             int idleFold,
             int maxSolutionSeconds) {
 
+            BoardsGenerated++;
+            Phase = "Generating";
+
             List<ElementDetails> newdna = new();
             PatternData pattern = patterns.ElementAt(rnd.Next(patterns.Count()));
             char[] chrs = pattern.DNA.ToCharArray();
@@ -33,16 +45,23 @@ namespace GenDash.Engine {
             ElementDetails[] dna = newdna.ToArray();
 
             Board board = new((byte)rnd.Next(pattern.MinWidth, pattern.MaxWidth), (byte)rnd.Next(pattern.MinHeight, pattern.MaxHeight));
+            CurrentBoardWidth = board.ColCount;
+            CurrentBoardHeight = board.RowCount;
+            
             board.Randomize(rnd, pattern, dna);
             Board original = new(board);
             ulong hash = original.FNV1aHash();
             
             if (recordHashes.Contains(hash))
             {
+                Phase = "Duplicate";
+                BoardsRejected++;
                 return;
             }
             if (rejectHashes.Contains(hash))
             {
+                Phase = "Duplicate";
+                BoardsRejected++;
                 return;
             }
 
@@ -51,8 +70,12 @@ namespace GenDash.Engine {
             }
             board.Place(new Element(Element.Player), board.StartY, board.StartX);
 
+            Phase = "Solving";
             Solution s = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), maxMove, 1f);
+            
             if (s != null && s.Bound < minMove) {
+                Phase = "Rejected";
+                BoardsRejected++;
                 var rejectElement = new XElement("Reject",
                     new XElement("Hash", hash),
                     new XElement("Reason", "MinMove")
@@ -64,6 +87,8 @@ namespace GenDash.Engine {
                 s = null;
             } else 
             if (s == null && Solver.LastSearchResult == Solver.TIMEDOUT) {
+                Phase = "Rejected";
+                BoardsRejected++;
                 var rejectElement = new XElement("Reject",
                     new XElement("Hash", hash),
                     new XElement("Reason", "Timeout with no solution"),
@@ -76,6 +101,8 @@ namespace GenDash.Engine {
                 s = null;
             } else
             if (s == null) {
+                Phase = "Rejected";
+                BoardsRejected++;
                 var rejectElement = new XElement("Reject",
                     new XElement("Hash", hash),
                     new XElement("Reason", "Unsolveable")
@@ -87,19 +114,25 @@ namespace GenDash.Engine {
             }
 
             if (s != null) {
+                Phase = "Optimizing";
                 float first = s.Bound;
+                OptimizeBound = s.Bound;
                 do
                 {
-                    Solver.Tries ++;
                     Solution better = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), s.Bound, (s.Bound - 1) / first);                    
                     if (better != null && better.Bound < s.Bound) {
                         s = better;
+                        OptimizeBound = better.Bound;
                         if (s.Bound < minMove) {
+                            Phase = "Rejected";
+                            BoardsRejected++;
                             s = null;
                             break;
                         }
                     } else
                         if (better == null && Solver.LastSearchResult == Solver.TIMEDOUT) {
+                            Phase = "Rejected";
+                            BoardsRejected++;
                             var rejectElement = new XElement("Reject",
                                 new XElement("Hash", hash),
                                 new XElement("Width", original.ColCount),
@@ -123,7 +156,9 @@ namespace GenDash.Engine {
                         }
 
                 } while (true);
+                
                 if (s != null) {
+                    Phase = "Scoring";
                     XElement solution = new("Solution");
                     int steps = 0;
                     Board prev = null;
@@ -188,6 +223,8 @@ namespace GenDash.Engine {
                     solution.SetAttributeValue("Score", score);
                     if (score >= minScore)
                     {
+                        Phase = "Saving";
+                        BoardsSaved++;
                         var boardElement = new XElement("Board",
                             new XElement("Hash", original.FNV1aHash()),
                             new XElement("Width", original.ColCount),
@@ -209,6 +246,8 @@ namespace GenDash.Engine {
                     }
                     else
                     {
+                        Phase = "Rejected";
+                        BoardsRejected++;
                         var rejectElement = new XElement("Reject",
                                new XElement("Hash", hash),
                                new XElement("Width", original.ColCount),
@@ -229,8 +268,9 @@ namespace GenDash.Engine {
                         saveQueue.Enqueue(() => puzzledb.Element("Rejects").Add(rejectElement));
                     }
                 }
-            } 
+            }
+            
+            Phase = "Complete";
         }
-
     }
 }
