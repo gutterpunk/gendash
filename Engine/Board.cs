@@ -334,5 +334,28 @@ namespace GenDash.Engine {
             _cachedHash = HashUtility.ComputeFNV1aHash(ColCount, RowCount, ToString());
             return _cachedHash.Value;
         }
+
+        public ulong FNV1aStateHash()
+        {
+            return HashUtility.ComputeFNV1aHash(ColCount, RowCount, ToStateString(includeFalling: true));
+        }
+
+        private string ToStateString(bool includeFalling)
+        {
+            var b = new StringBuilder(RowCount * ColCount * (includeFalling ? 2 : 1));
+            for (int i = 0; i < RowCount; i++) {
+                for (int j = 0; j < ColCount; j++) {
+                    Element d = Data[i * ColCount + j];
+                    if (d == null) {
+                        b.Append(Element.Space.Symbols[DirectionType.Undefined]);
+                        if (includeFalling) b.Append('0');
+                        continue;
+                    }
+                    b.Append(d.Details.Symbols[d.Look]);
+                    if (includeFalling) b.Append(d.Falling ? '1' : '0');
+                }
+            }
+            return b.ToString();
+        }
     }
 }

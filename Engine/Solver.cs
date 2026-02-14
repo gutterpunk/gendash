@@ -149,7 +149,7 @@ namespace GenDash.Engine {
             int fcost = gcost + Heuristic(node, ratio);
             
             if (fcost > solution.Bound) return fcost;
-            if (IsGoal(node)) return FOUND;
+            if (IsGoal(node)) return ValidateSolution(solution) ? FOUND : NOT_FOUND;
             
             int min = NOT_FOUND;
             
@@ -158,7 +158,7 @@ namespace GenDash.Engine {
                         
             for (int i = 0; i < _successorBuffer.Count; i++) {
                 Board board = _successorBuffer[i];
-                ulong boardHash = board.FNV1aHash();
+                ulong boardHash = board.FNV1aStateHash();
                 
                 if (!_pathHashes.Contains(boardHash)) {
                     solution.Path.Add(board);
@@ -177,6 +177,24 @@ namespace GenDash.Engine {
             }
             
             return min;
+        }
+
+        private static bool ValidateSolution(Solution solution) {
+            if (solution.Path.Count <= 1) return true;
+
+            Board current = new(solution.Path[0]);
+            for (int i = 1; i < solution.Path.Count; i++) {
+                string move = solution.Path[i].NameMove();
+                current.SetMove(move);
+                if (!current.Fold()) {
+                    return false;
+                }
+                if (current.FNV1aStateHash() != solution.Path[i].FNV1aStateHash()) {
+                    return false;
+                }
+            }
+
+            return true;
         }
         
         private static bool IsGoal(Board node) {
