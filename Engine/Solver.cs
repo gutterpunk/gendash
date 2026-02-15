@@ -12,6 +12,8 @@ namespace GenDash.Engine {
         private readonly HashSet<ulong> _pathHashes = [];
         private readonly Point[] _diamondBuffer = new Point[32];
         private int _diamondBufferCount = 0;
+        private int _timeoutCheckCounter = 0;
+        private const int TIMEOUT_CHECK_INTERVAL = 100;
         
         public bool IsCanceled { get; private set; }
         public const int FOUND = int.MaxValue;
@@ -21,6 +23,12 @@ namespace GenDash.Engine {
         public int LastSearchResult { get; private set; }
         public DateTime LastSearch { get; private set; }
         public DateTime Timeout { get; private set; }
+        
+        public int CurrentDepth { get; private set; }
+        public int MaxDepth { get; private set; }
+        public int NodesExplored { get; private set; }
+        public int CurrentBound { get; private set; }
+        public int HashTableSize => _pathHashes.Count;
         
         public Solver() {
             for (int i = 0; i < _diamondBuffer.Length; i++) {
@@ -38,6 +46,11 @@ namespace GenDash.Engine {
                 LastSearch = DateTime.Now;
                 Timeout = DateTime.Now.AddSeconds(delay.TotalSeconds);
                 _pathHashes.Clear();
+                _timeoutCheckCounter = 0;
+                CurrentDepth = 0;
+                MaxDepth = 0;
+                NodesExplored = 0;
+                CurrentBound = solution.Bound;
                 
                 int t = Search(solution, 0, Timeout, ratio);
                 LastSearchResult = t;
@@ -140,8 +153,14 @@ namespace GenDash.Engine {
         }
 
         private int Search(Solution solution, int gcost, DateTime? tryUntil, float ratio = 1f) {
-            if (tryUntil.HasValue && tryUntil.Value <= DateTime.Now) 
-                return TIMEDOUT;
+            NodesExplored++;
+            CurrentDepth = solution.Path.Count - 1;
+            if (CurrentDepth > MaxDepth) MaxDepth = CurrentDepth;
+            
+            if (tryUntil.HasValue && ++_timeoutCheckCounter % TIMEOUT_CHECK_INTERVAL == 0) {
+                if (tryUntil.Value <= DateTime.Now) 
+                    return TIMEDOUT;
+            }
             
             if (IsCanceled) return CANCELED;
             
@@ -155,8 +174,15 @@ namespace GenDash.Engine {
             
             _successorBuffer.Clear();
             node.FoldSuccessors(_successorBuffer);
+            
+            if (_successorBuffer.Count > 1) {
+                _successorBuffer.Sort((a, b) => Heuristic(a, ratio).CompareTo(Heuristic(b, ratio)));
+            }
                         
             for (int i = 0; i < _successorBuffer.Count; i++) {
+                if (tryUntil.HasValue && i % 3 == 0 && tryUntil.Value <= DateTime.Now) 
+                    return TIMEDOUT;
+                
                 Board board = _successorBuffer[i];
                 ulong boardHash = board.FNV1aStateHash();
                 
@@ -199,25 +225,25 @@ namespace GenDash.Engine {
         
         private static bool IsGoal(Board node) {
             int totalElements = node.Data.Length;
-            bool hasDiamond = false;
+            int playerIndex = -1;
             
+            // Single pass: check for diamonds and find player
             for (int i = 0; i < totalElements; i++) {
                 Element e = node.Data[i];
-                if (e != null && e.Details == Element.Diamond) {
-                    hasDiamond = true;
-                    break;
+                if (e == null) continue;
+                
+                if (e.Details == Element.Diamond) {
+                    return false; // Early exit: can't be goal with diamonds remaining
+                }
+                if (e.Details == Element.Player) {
+                    playerIndex = i;
                 }
             }
-            
-            if (!hasDiamond) {
-                for (int i = 0; i < totalElements; i++) {
-                    Element e = node.Data[i];
-                    if (e != null && e.Details == Element.Player) {
-                        int col = i % node.ColCount;
-                        int row = i / node.ColCount;
-                        return col == node.ExitX && row == node.ExitY;
-                    }
-                }
+
+            if (playerIndex >= 0) {
+                int col = playerIndex % node.ColCount;
+                int row = playerIndex / node.ColCount;
+                return col == node.ExitX && row == node.ExitY;
             }
             
             return false;

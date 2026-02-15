@@ -73,7 +73,7 @@ namespace GenDash.Engine {
             Phase = "Solving";
             Solution s = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), maxMove, 1f);
             
-            if (s != null && s.Bound < minMove) {
+            if (s != null && s.Path.Count - 1 < minMove) {
                 Phase = "Rejected";
                 BoardsRejected++;
                 var rejectElement = new XElement("Reject",
@@ -115,15 +115,77 @@ namespace GenDash.Engine {
 
             if (s != null) {
                 Phase = "Optimizing";
-                float first = s.Bound;
-                OptimizeBound = s.Bound;
+                int initialPathLength = s.Path.Count - 1;
+                float first = initialPathLength;
+                OptimizeBound = initialPathLength;
                 do
                 {
-                    Solution better = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), s.Bound, (s.Bound - 1) / first);                    
-                    if (better != null && better.Bound < s.Bound) {
+
+                    int stationaryMoves = 0;
+                    foreach (Board b in s.Path) {
+                        if (b.Previous == null) continue;
+                        
+                        int currentPlayerPos = -1;
+                        int previousPlayerPos = -1;
+                        
+                        for (int i = 0; i < b.Data.Length; i++) {
+                            if (b.Data[i] != null && b.Data[i].Details == Element.Player) {
+                                currentPlayerPos = i;
+                            }
+                            if (b.Previous.Data[i] != null && b.Previous.Data[i].Details == Element.Player) {
+                                previousPlayerPos = i;
+                            }
+                        }
+                        
+                        if (currentPlayerPos >= 0 && currentPlayerPos == previousPlayerPos) {
+                            bool adjacentChanged = false;
+                            
+                            if (b.Grabbing) {
+                                int col = currentPlayerPos % b.ColCount;
+                                int row = currentPlayerPos / b.ColCount;
+                                
+                                int[] adjacentOffsets = { -b.ColCount, b.ColCount, -1, 1 };
+                                
+                                for (int j = 0; j < adjacentOffsets.Length; j++) {
+                                    int adjPos = currentPlayerPos + adjacentOffsets[j];
+                                    
+                                    if (adjPos >= 0 && adjPos < b.Data.Length) {
+                                        if (j >= 2) { // Left or right (indices 2 and 3)
+                                            int adjRow = adjPos / b.ColCount;
+                                            if (adjRow != row) continue;
+                                        }
+                                        
+                                        var currentAdj = b.Data[adjPos];
+                                        var previousAdj = b.Previous.Data[adjPos];
+                                        
+                                        bool currentNull = currentAdj == null;
+                                        bool previousNull = previousAdj == null;
+                                        
+                                        if (currentNull != previousNull || 
+                                            (!currentNull && !previousNull && currentAdj.Details != previousAdj.Details)) {
+                                            adjacentChanged = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if (!adjacentChanged) {
+                                stationaryMoves++;
+                            }
+                        }
+                    }
+
+                    int currentPathLength = s.Path.Count - 1;
+                    int targetBound = Math.Max(1, currentPathLength - stationaryMoves);
+                    
+                    float ratio = first > 0 ? Math.Max(0.1f, targetBound / first) : 1f;
+                    
+                    Solution better = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), targetBound, ratio);                    
+                    if (better != null && better.Path.Count - 1 < currentPathLength) {
                         s = better;
-                        OptimizeBound = better.Bound;
-                        if (s.Bound < minMove) {
+                        OptimizeBound = s.Path.Count - 1;
+                        if (s.Path.Count - 1 < minMove) {
                             Phase = "Rejected";
                             BoardsRejected++;
                             s = null;

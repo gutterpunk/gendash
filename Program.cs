@@ -3,6 +3,7 @@ using System.IO;
 using System.Xml.Linq;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using GenDash.Engine;
@@ -26,6 +27,14 @@ namespace GenDash {
     }
   
     class Program {
+        // Windows API to prevent sleep
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern uint SetThreadExecutionState(uint esFlags);
+        
+        private const uint ES_CONTINUOUS = 0x80000000;
+        private const uint ES_SYSTEM_REQUIRED = 0x00000001;
+        private const uint ES_DISPLAY_REQUIRED = 0x00000002;
+        
         private static bool TrySetCursorPosition(int left, int top) {
             try {
                 if (left >= 0 && left < Console.BufferWidth && top >= 0 && top < Console.BufferHeight) {
@@ -36,6 +45,14 @@ namespace GenDash {
                 // Silently handle any exceptions
             }
             return false;
+        }
+
+        private static string FormatNumber(int number) {
+            if (number >= 1000000)
+                return $"{number / 1000000.0:F1}M";
+            if (number >= 1000)
+                return $"{number / 1000.0:F1}K";
+            return number.ToString();
         }
 
         /// <summary>
@@ -82,6 +99,9 @@ namespace GenDash {
         }
 
         static void Main(string[] args) {
+ 
+            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+            
             int seed = int.MaxValue;
             int minMove = 15;
             int minScore = 100;
@@ -375,7 +395,6 @@ namespace GenDash {
                         lastSave = DateTime.Now;
                     }
 
-                    // Only update UI periodically to reduce overhead
                     if ((DateTime.Now - lastUIUpdate).TotalMilliseconds >= uiUpdateIntervalMs)
                     {
                         TrySetCursorPosition(cposx, cposy);
@@ -385,29 +404,32 @@ namespace GenDash {
                             {
                                 var worker = tasks[t];
                                 var now = DateTime.Now;
+                                var elapsed = (now - worker.Solver.LastSearch).TotalSeconds;
                                 var timeout = (worker.Solver.Timeout - worker.Solver.LastSearch).TotalSeconds;
-                                var progress = 0;
-                                if (timeout > 0)
-                                {
-                                    progress = (int)Math.Ceiling(((now - worker.Solver.LastSearch).TotalSeconds * 60) / timeout);
-                                    progress = Math.Min(progress, 60);
-                                }
+                                var timeRemaining = Math.Max(0, timeout - elapsed);
                                 
                                 int result = worker.Solver.LastSearchResult;
                                 string resultStr = result switch
                                 {
                                     Solver.NOT_FOUND => "NF",
                                     Solver.FOUND => "OK",
+                                    Solver.TIMEDOUT => "TO",
+                                    Solver.CANCELED => "CN",
                                     _ => result.ToString()
                                 };
                                 
                                 string size = $"{worker.CurrentBoardWidth}x{worker.CurrentBoardHeight}";
                                 string phase = worker.Phase.PadRight(10);
-                                string stats = $"G:{worker.BoardsGenerated} S:{worker.BoardsSaved} R:{worker.BoardsRejected}";
+
+                                string metrics = $"D:{worker.Solver.CurrentDepth}/{worker.Solver.MaxDepth}".PadRight(10);
+                                string nodes = $"N:{FormatNumber(worker.Solver.NodesExplored)}".PadRight(12);
+                                string hash = $"H:{FormatNumber(worker.Solver.HashTableSize)}".PadRight(10);
+                                string bound = $"B:{worker.Solver.CurrentBound}".PadRight(8);
+                                string optimizing = worker.OptimizeBound > 0 ? $"O:{worker.OptimizeBound}".PadRight(8) : "".PadRight(8);
+                                string time = $"T:{timeRemaining:F0}s".PadRight(8);
                                 
                                 Console.WriteLine(
-                                    $"{t.Id,4} [{"".PadRight(progress, '█'),-60}] " +
-                                    $"{resultStr,3} | {phase} | {worker.OptimizeBound}".PadRight(40)
+                                    $"{t.Id,4} {resultStr,3} | {phase} | {size,6} | {metrics} {nodes} {hash} {bound} {optimizing} | {time}"
                                 );
                             }
                         }
@@ -428,6 +450,8 @@ namespace GenDash {
             }
 
             source.Cancel();
+            
+            SetThreadExecutionState(ES_CONTINUOUS);
         }
     }
 }
