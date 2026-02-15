@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GenDash {
+namespace GenDash.Utils {
     class CommandLineOptions {
         public int Seed { get; set; } = int.MaxValue;
         public int MinMove { get; set; } = 15;
