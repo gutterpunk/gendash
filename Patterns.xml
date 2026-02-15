@@ -2,8 +2,8 @@
 <GenDash>
   <Patterns>
     <Pattern>
-      <MinWidth>5</MinWidth>
-      <MinHeight>5</MinHeight>
+      <MinWidth>6</MinWidth>
+      <MinHeight>6</MinHeight>
       <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.0</MobRatio>      
@@ -11,8 +11,8 @@
       <Commands></Commands>
     </Pattern>    
     <Pattern>
-      <MinWidth>5</MinWidth>
-      <MinHeight>5</MinHeight>
+      <MinWidth>6</MinWidth>
+      <MinHeight>6</MinHeight>
       <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.07</MobRatio>      
@@ -20,8 +20,8 @@
       <Commands></Commands>
     </Pattern>    
     <Pattern>
-      <MinWidth>5</MinWidth>
-      <MinHeight>5</MinHeight>
+      <MinWidth>6</MinWidth>
+      <MinHeight>6</MinHeight>
       <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.02</MobRatio>      
@@ -62,8 +62,8 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>5</MinWidth>
-      <MinHeight>5</MinHeight>
+      <MinWidth>6</MinWidth>
+      <MinHeight>6</MinHeight>
       <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.02</MobRatio>
@@ -104,8 +104,8 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>5</MinWidth>
-      <MinHeight>5</MinHeight>
+      <MinWidth>6</MinWidth>
+      <MinHeight>6</MinHeight>
       <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.02</MobRatio>
@@ -150,8 +150,8 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>5</MinWidth>
-      <MinHeight>5</MinHeight>
+      <MinWidth>6</MinWidth>
+      <MinHeight>6</MinHeight>
       <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.02</MobRatio>
@@ -184,8 +184,8 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>5</MinWidth>
-      <MinHeight>5</MinHeight>
+      <MinWidth>6</MinWidth>
+      <MinHeight>6</MinHeight>
       <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.05</MobRatio>
@@ -218,8 +218,8 @@
       </Commands>
     </Pattern>
     <Pattern>
-      <MinWidth>5</MinWidth>
-      <MinHeight>5</MinHeight>
+      <MinWidth>6</MinWidth>
+      <MinHeight>6</MinHeight>
       <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.02</MobRatio>
@@ -240,8 +240,8 @@
       </Commands>      
     </Pattern>
     <Pattern>
-      <MinWidth>5</MinWidth>
-      <MinHeight>5</MinHeight>
+      <MinWidth>6</MinWidth>
+      <MinHeight>6</MinHeight>
       <MaxWidth>12</MaxWidth>
       <MaxHeight>12</MaxHeight>
       <MobRatio>0.05</MobRatio>

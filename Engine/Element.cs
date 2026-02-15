@@ -40,6 +40,7 @@ namespace GenDash.Engine
     }
     public class ElementDetails {
         public IDictionary<Direction, char> Symbols { get; set; } = new Dictionary<Direction, char>();
+        public byte HashId { get; set; }
         public bool Important { get; set; } = true;
         public bool Mob { get; set; } = false;
         public bool Indestructible { get; set; } = false;
@@ -49,16 +50,17 @@ namespace GenDash.Engine
         public Direction StartFacing { get; set; } = DirectionType.Undefined;
     }
     public class Element {
-        public static readonly ElementDetails Player = new() { Symbols = { { DirectionType.Undefined, '@' } }, Explosion = ExplosionType.Explode };
-        public static readonly ElementDetails Space = new() { Symbols = { { DirectionType.Undefined, '.' } } };
-        public static readonly ElementDetails Dirt = new() { Symbols = { { DirectionType.Undefined, '*' } } };
-        public static readonly ElementDetails Boulder = new() { Symbols = { { DirectionType.Undefined, '0' } }, Rounded = true };
-        public static readonly ElementDetails Diamond = new() { Symbols = { { DirectionType.Undefined, 'd' } }, Rounded = true };
-        public static readonly ElementDetails Bricks = new() { Symbols = { { DirectionType.Undefined, '#' } }, Rounded = true };
-        public static readonly ElementDetails Steel = new() { Symbols = { { DirectionType.Undefined, '%' } }, Indestructible = true };
+        public static readonly ElementDetails Player = new() { HashId = 1, Symbols = { { DirectionType.Undefined, '@' } }, Explosion = ExplosionType.Explode };
+        public static readonly ElementDetails Space = new() { HashId = 2, Symbols = { { DirectionType.Undefined, '.' } } };
+        public static readonly ElementDetails Dirt = new() { HashId = 3, Symbols = { { DirectionType.Undefined, '*' } } };
+        public static readonly ElementDetails Boulder = new() { HashId = 4, Symbols = { { DirectionType.Undefined, '0' } }, Rounded = true };
+        public static readonly ElementDetails Diamond = new() { HashId = 5, Symbols = { { DirectionType.Undefined, 'd' } }, Rounded = true };
+        public static readonly ElementDetails Bricks = new() { HashId = 6, Symbols = { { DirectionType.Undefined, '#' } }, Rounded = true };
+        public static readonly ElementDetails Steel = new() { HashId = 7, Symbols = { { DirectionType.Undefined, '%' } }, Indestructible = true };
 
         public static readonly ElementDetails Firefly = new()
         {
+            HashId = 8,
             Symbols = {
                 { DirectionType.Up, '^' },
                 { DirectionType.Left, '<' },
@@ -73,6 +75,7 @@ namespace GenDash.Engine
 
         public static readonly ElementDetails Butterfly = new()
         {
+            HashId = 9,
             Symbols = {
                 { DirectionType.Up, 'M' },
                 { DirectionType.Left, 'E' },
@@ -85,20 +88,18 @@ namespace GenDash.Engine
             Explosion = ExplosionType.Explode
         };
 
-        public static readonly ElementDetails Explosion0 = new() { Symbols = { { DirectionType.Undefined, '5' } } };
-        public static readonly ElementDetails Explosion1 = new() { Symbols = { { DirectionType.Undefined, '6' } } };
-        public static readonly ElementDetails Explosion2 = new() { Symbols = { { DirectionType.Undefined, '7' } } };
-        public static readonly ElementDetails Explosion3 = new() { Symbols = { { DirectionType.Undefined, '8' } } };
-        public static readonly ElementDetails Explosion4 = new() { Symbols = { { DirectionType.Undefined, '9' } } };
+        public static readonly ElementDetails Explosion0 = new() { HashId = 10, Symbols = { { DirectionType.Undefined, '5' } } };
+        public static readonly ElementDetails Explosion1 = new() { HashId = 11, Symbols = { { DirectionType.Undefined, '6' } } };
+        public static readonly ElementDetails Explosion2 = new() { HashId = 12, Symbols = { { DirectionType.Undefined, '7' } } };
+        public static readonly ElementDetails Explosion3 = new() { HashId = 13, Symbols = { { DirectionType.Undefined, '8' } } };
+        public static readonly ElementDetails Explosion4 = new() { HashId = 14, Symbols = { { DirectionType.Undefined, '9' } } };
 
-        public static readonly ElementDetails ExplosionToDiamond0 = new() { Symbols = { { DirectionType.Undefined, 'Y' } } };
-        public static readonly ElementDetails ExplosionToDiamond1 = new() { Symbols = { { DirectionType.Undefined, 'U' } } };
-        public static readonly ElementDetails ExplosionToDiamond2 = new() { Symbols = { { DirectionType.Undefined, 'I' } } };
-        public static readonly ElementDetails ExplosionToDiamond3 = new() { Symbols = { { DirectionType.Undefined, 'P' } } };
-        public static readonly ElementDetails ExplosionToDiamond4 = new() { Symbols = { { DirectionType.Undefined, 'T' } } };
+        public static readonly ElementDetails ExplosionToDiamond0 = new() { HashId = 15, Symbols = { { DirectionType.Undefined, 'Y' } } };
+        public static readonly ElementDetails ExplosionToDiamond1 = new() { HashId = 16, Symbols = { { DirectionType.Undefined, 'U' } } };
+        public static readonly ElementDetails ExplosionToDiamond2 = new() { HashId = 17, Symbols = { { DirectionType.Undefined, 'I' } } };
+        public static readonly ElementDetails ExplosionToDiamond3 = new() { HashId = 18, Symbols = { { DirectionType.Undefined, 'P' } } };
+        public static readonly ElementDetails ExplosionToDiamond4 = new() { HashId = 19, Symbols = { { DirectionType.Undefined, 'T' } } };
 
-        private static int IdCounter;
-        public int Id { get; }
         public bool Scanned { get; set; }
         public bool Falling { get; set; }
         public ElementDetails Details { get; set; }
@@ -106,15 +107,11 @@ namespace GenDash.Engine
         public Direction Look { get; set; } = DirectionType.Undefined;
 
         public Element(ElementDetails details) {
-            Id = IdCounter;
             Details = details;
-            IdCounter++;
             Look = details.StartFacing;
         }
         public Element(ElementDetails details, Direction direction) {
-            Id = IdCounter;
             Details = details;
-            IdCounter++;
             Look = direction;
         }
         public static ElementDetails CharToElementDetails(char chr) {
@@ -253,7 +250,7 @@ namespace GenDash.Engine
         private static bool FoldPlayer(Board board, Element element, int row, int col) {
             var dest = board.GetElementAt(row + board.InputY, col + board.InputX);
             if (row + board.InputY == board.ExitY && col + board.InputX == board.ExitX)
-                if (Array.Find(board.Data, x => x != null && x.Details == Diamond) == null) 
+                if (board.DiamondCount == 0) 
                     dest = new Element(Space);
             if (dest == null || dest.Details == Space || dest.Details == Dirt || dest.Details == Diamond) {
                 element.Scanned = true;

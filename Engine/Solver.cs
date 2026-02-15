@@ -14,6 +14,8 @@ namespace GenDash.Engine {
         private int _diamondBufferCount = 0;
         private int _timeoutCheckCounter = 0;
         private const int TIMEOUT_CHECK_INTERVAL = 100;
+        private readonly int[] _heuristicCache = new int[9];
+        private long _deadlineTicks;
         
         public bool IsCanceled { get; private set; }
         public const int FOUND = int.MaxValue;
@@ -45,6 +47,7 @@ namespace GenDash.Engine {
             while (true) {
                 LastSearch = DateTime.Now;
                 Timeout = DateTime.Now.AddSeconds(delay.TotalSeconds);
+                _deadlineTicks = Environment.TickCount64 + (long)delay.TotalMilliseconds;
                 _pathHashes.Clear();
                 _timeoutCheckCounter = 0;
                 CurrentDepth = 0;
@@ -52,7 +55,7 @@ namespace GenDash.Engine {
                 NodesExplored = 0;
                 CurrentBound = solution.Bound;
                 
-                int t = Search(solution, 0, Timeout, ratio);
+                int t = Search(solution, 0, ratio);
                 LastSearchResult = t;
                 
                 if (t == FOUND) {
@@ -81,8 +84,14 @@ namespace GenDash.Engine {
         
         private int Heuristic(Board node, float ratio = 1f) {
             int d = 0;
-            int x = -1;
-            int y = -1;
+            int x = node.PlayerCol;
+            int y = node.PlayerRow;
+            
+            if (x < 0 || y < 0) return 10000;
+            
+            if (node.DiamondCount == 0) {
+                return (int)Math.Floor((Math.Abs(x - node.ExitX) + Math.Abs(y - node.ExitY)) * ratio);
+            }
             
             _diamondBufferCount = 0;
             
@@ -97,9 +106,6 @@ namespace GenDash.Engine {
                         _diamondBuffer[_diamondBufferCount].Y = i / node.ColCount;
                         _diamondBufferCount++;
                     }
-                } else if (e.Details == Element.Player) {
-                    x = i % node.ColCount;
-                    y = i / node.ColCount;
                 }
             }
             
@@ -143,22 +149,16 @@ namespace GenDash.Engine {
         }
         
         private static int Cost(Board from, Board next) {
-            int totalElements = next.Data.Length;
-            for (int i = 0; i < totalElements; i++) {
-                Element e = next.Data[i];
-                if (e != null && e.Details == Element.Player)
-                    return 1;
-            }
-            return 10000;
+            return next.PlayerRow >= 0 ? 1 : 10000;
         }
 
-        private int Search(Solution solution, int gcost, DateTime? tryUntil, float ratio = 1f) {
+        private int Search(Solution solution, int gcost, float ratio = 1f) {
             NodesExplored++;
             CurrentDepth = solution.Path.Count - 1;
             if (CurrentDepth > MaxDepth) MaxDepth = CurrentDepth;
             
-            if (tryUntil.HasValue && ++_timeoutCheckCounter % TIMEOUT_CHECK_INTERVAL == 0) {
-                if (tryUntil.Value <= DateTime.Now) 
+            if (++_timeoutCheckCounter % TIMEOUT_CHECK_INTERVAL == 0) {
+                if (Environment.TickCount64 >= _deadlineTicks) 
                     return TIMEDOUT;
             }
             
@@ -176,11 +176,26 @@ namespace GenDash.Engine {
             node.FoldSuccessors(_successorBuffer);
             
             if (_successorBuffer.Count > 1) {
-                _successorBuffer.Sort((a, b) => Heuristic(a, ratio).CompareTo(Heuristic(b, ratio)));
+                int count = _successorBuffer.Count;
+                for (int si = 0; si < count; si++) {
+                    _heuristicCache[si] = Heuristic(_successorBuffer[si], ratio);
+                }
+                for (int si = 1; si < count; si++) {
+                    int key = _heuristicCache[si];
+                    Board keyBoard = _successorBuffer[si];
+                    int sj = si - 1;
+                    while (sj >= 0 && _heuristicCache[sj] > key) {
+                        _heuristicCache[sj + 1] = _heuristicCache[sj];
+                        _successorBuffer[sj + 1] = _successorBuffer[sj];
+                        sj--;
+                    }
+                    _heuristicCache[sj + 1] = key;
+                    _successorBuffer[sj + 1] = keyBoard;
+                }
             }
                         
             for (int i = 0; i < _successorBuffer.Count; i++) {
-                if (tryUntil.HasValue && i % 3 == 0 && tryUntil.Value <= DateTime.Now) 
+                if (i % 3 == 0 && Environment.TickCount64 >= _deadlineTicks) 
                     return TIMEDOUT;
                 
                 Board board = _successorBuffer[i];
@@ -190,7 +205,7 @@ namespace GenDash.Engine {
                     solution.Path.Add(board);
                     _pathHashes.Add(boardHash);
                     
-                    int t = Search(solution, gcost + Cost(node, board), tryUntil, ratio);
+                    int t = Search(solution, gcost + Cost(node, board), ratio);
                     
                     if (t == FOUND) return FOUND;
                     if (t == TIMEDOUT) return TIMEDOUT;
@@ -224,29 +239,8 @@ namespace GenDash.Engine {
         }
         
         private static bool IsGoal(Board node) {
-            int totalElements = node.Data.Length;
-            int playerIndex = -1;
-            
-            // Single pass: check for diamonds and find player
-            for (int i = 0; i < totalElements; i++) {
-                Element e = node.Data[i];
-                if (e == null) continue;
-                
-                if (e.Details == Element.Diamond) {
-                    return false; // Early exit: can't be goal with diamonds remaining
-                }
-                if (e.Details == Element.Player) {
-                    playerIndex = i;
-                }
-            }
-
-            if (playerIndex >= 0) {
-                int col = playerIndex % node.ColCount;
-                int row = playerIndex / node.ColCount;
-                return col == node.ExitX && row == node.ExitY;
-            }
-            
-            return false;
+            if (node.DiamondCount > 0) return false;
+            return node.PlayerRow >= 0 && node.PlayerCol == node.ExitX && node.PlayerRow == node.ExitY;
         }      
     }
 }

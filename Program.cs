@@ -369,15 +369,13 @@ namespace GenDash {
             {
                 while (!Console.KeyAvailable)
                 {
-                    int count = Math.Max(0, cpu - tasks.Keys.Where(x =>
-                        x.Status != TaskStatus.Canceled &&
-                        x.Status != TaskStatus.Faulted &&
-                        x.Status != TaskStatus.RanToCompletion).Count());
+                    int count = Math.Max(0, cpu - tasks.Count);
 
                     for (int i = 0; i < count; i++)
                     {
                         Worker worker = new();
-                        Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, rnd, puzzledb, recordHashes, patterns, rejectHashes, saveQueue, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
+                        int workerSeed = rnd.Next();
+                        Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, new Random(workerSeed), puzzledb, recordHashes, patterns, rejectHashes, saveQueue, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
                             source.Token);
                         tasks.Add(t, worker);
                     }
@@ -434,6 +432,20 @@ namespace GenDash {
                             }
                         }
                         lastUIUpdate = DateTime.Now;
+
+                        // Prune completed tasks
+                        List<Task> completedTasks = null;
+                        foreach (var kvp in tasks) {
+                            if (kvp.Key.Status == TaskStatus.RanToCompletion || 
+                                kvp.Key.Status == TaskStatus.Faulted || 
+                                kvp.Key.Status == TaskStatus.Canceled) {
+                                completedTasks ??= new List<Task>();
+                                completedTasks.Add(kvp.Key);
+                            }
+                        }
+                        if (completedTasks != null) {
+                            foreach (var ct in completedTasks) tasks.Remove(ct);
+                        }
                     }
 
                     Thread.Sleep(100);

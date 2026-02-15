@@ -36,7 +36,7 @@ namespace GenDash.Engine {
             Phase = "Generating";
 
             List<ElementDetails> newdna = new();
-            PatternData pattern = patterns.ElementAt(rnd.Next(patterns.Count()));
+            PatternData pattern = patterns[rnd.Next(patterns.Count)];
             char[] chrs = pattern.DNA.ToCharArray();
             for (int i = 0; i < chrs.Length; i++) {
                 char c = chrs[i];
@@ -52,13 +52,16 @@ namespace GenDash.Engine {
             Board original = new(board);
             ulong hash = original.FNV1aHash();
             
-            if (recordHashes.Contains(hash))
+            bool isDuplicate;
+            lock (recordHashes) { isDuplicate = recordHashes.Contains(hash); }
+            if (isDuplicate)
             {
                 Phase = "Duplicate";
                 BoardsRejected++;
                 return;
             }
-            if (rejectHashes.Contains(hash))
+            lock (rejectHashes) { isDuplicate = rejectHashes.Contains(hash); }
+            if (isDuplicate)
             {
                 Phase = "Duplicate";
                 BoardsRejected++;

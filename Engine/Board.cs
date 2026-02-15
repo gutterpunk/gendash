@@ -22,6 +22,9 @@ namespace GenDash.Engine {
         public byte RowCount { get; }
         public byte ColCount { get; }
         public Element[] Data { get; }
+        public int DiamondCount { get; set; }
+        public int PlayerRow { get; set; } = -1;
+        public int PlayerCol { get; set; } = -1;
 
         private readonly Element borderElement = new(Element.Steel);
 
@@ -34,6 +37,7 @@ namespace GenDash.Engine {
             RowCount = height;
             ColCount = width;
             Data = new Element[RowCount * ColCount];
+            DiamondCount = 0;
             char[] carray = data.ToCharArray();
             for (int i = 0; i < RowCount; i++)
                 for (int j = 0; j < ColCount; j++) {
@@ -41,10 +45,10 @@ namespace GenDash.Engine {
                     var dir = Element.CharToFacing(carray[i * ColCount + j]);
                     var e = new Element(details, dir);
                     if (e == null) continue;
-                    Data[i * ColCount + j] = new(e.Details)
-                    {
-                        Look = e.Look
-                    };
+                    var elem = new Element(e.Details) { Look = e.Look };
+                    Data[i * ColCount + j] = elem;
+                    if (details == Element.Diamond) DiamondCount++;
+                    if (details == Element.Player) { PlayerRow = i; PlayerCol = j; }
                 }            
         }
         public Board(Board clone) {
@@ -65,6 +69,9 @@ namespace GenDash.Engine {
             ExitY = clone.ExitY;
             StartX = clone.StartX;
             StartY = clone.StartY;
+            DiamondCount = clone.DiamondCount;
+            PlayerRow = clone.PlayerRow;
+            PlayerCol = clone.PlayerCol;
         }
         public string NameMove() {
             var moveName = new StringBuilder();
@@ -98,7 +105,7 @@ namespace GenDash.Engine {
                 for (int j = 0; j < ColCount; j++) {
                     int pick = rnd.Next(nonMobs.Length);
                     var element = new Element(nonMobs[pick]);
-                    Data[i * ColCount + j] = element;                    
+                    Place(element, i, j);                    
                 }
             }
             ElementDetails[] mobs = Array.FindAll(dna, x => x.Mob);
@@ -257,7 +264,17 @@ namespace GenDash.Engine {
             return !nomove;
         }
         public void Place(Element element, int row, int col) {
-            Data[row * ColCount + col] = element;
+            int index = row * ColCount + col;
+            Element existing = Data[index];
+            if (existing != null) {
+                if (existing.Details == Element.Diamond) DiamondCount--;
+                if (existing.Details == Element.Player) { PlayerRow = -1; PlayerCol = -1; }
+            }
+            if (element != null) {
+                if (element.Details == Element.Diamond) DiamondCount++;
+                if (element.Details == Element.Player) { PlayerRow = row; PlayerCol = col; }
+            }
+            Data[index] = element;
         }
 
         public Element GetElementAt(int row, int col) {
@@ -337,7 +354,25 @@ namespace GenDash.Engine {
 
         public ulong FNV1aStateHash()
         {
-            return HashUtility.ComputeFNV1aHash(ColCount, RowCount, ToStateString(includeFalling: true));
+            const ulong FnvOffset = 14695981039346656037;
+            const ulong FnvPrime = 1099511628211;
+            ulong hash = FnvOffset;
+            hash ^= ColCount; hash *= FnvPrime;
+            hash ^= RowCount; hash *= FnvPrime;
+            int totalLength = RowCount * ColCount;
+            for (int i = 0; i < totalLength; i++) {
+                Element e = Data[i];
+                if (e == null) {
+                    hash ^= Element.Space.HashId; hash *= FnvPrime;
+                    hash ^= 0; hash *= FnvPrime;
+                    hash ^= 0; hash *= FnvPrime;
+                } else {
+                    hash ^= e.Details.HashId; hash *= FnvPrime;
+                    hash ^= (byte)((e.Look.DirX + 2) * 5 + (e.Look.DirY + 2)); hash *= FnvPrime;
+                    hash ^= (byte)(e.Falling ? 1 : 0); hash *= FnvPrime;
+                }
+            }
+            return hash;
         }
 
         private string ToStateString(bool includeFalling)
