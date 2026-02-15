@@ -38,16 +38,25 @@ namespace GenDash.Engine {
             }
         }
         
-        public Solution Solve(int Id, Board root, TimeSpan delay, int maxcost = int.MaxValue, float ratio = 1f) {
+        public Solution Solve(int Id, Board root, TimeSpan delay, int maxcost = int.MaxValue, float ratio = 2f) {
             Solution solution = new()
             {
                 Path = { root },
                 Bound = Heuristic(root, ratio)
             };
+            
+            int iteration = 0;
+            double totalSecondsRemaining = delay.TotalSeconds;
+            
             while (true) {
                 LastSearch = DateTime.Now;
-                Timeout = DateTime.Now.AddSeconds(delay.TotalSeconds);
-                _deadlineTicks = Environment.TickCount64 + (long)delay.TotalMilliseconds;
+                
+                double baseTimeout = Math.Min(2.0, totalSecondsRemaining * 0.05); 
+                double scaleFactor = Math.Pow(1.75, iteration); // 1.75x growth per iteration
+                double iterationTimeout = Math.Min(baseTimeout * scaleFactor, totalSecondsRemaining);
+                
+                Timeout = DateTime.Now.AddSeconds(iterationTimeout);
+                _deadlineTicks = Environment.TickCount64 + (long)(iterationTimeout * 1000);
                 _pathHashes.Clear();
                 _timeoutCheckCounter = 0;
                 CurrentDepth = 0;
@@ -55,26 +64,33 @@ namespace GenDash.Engine {
                 NodesExplored = 0;
                 CurrentBound = solution.Bound;
                 
-                int t = Search(solution, 0, ratio);
-                LastSearchResult = t;
+                LastSearchResult = Search(solution, 0, ratio);
                 
-                if (t == FOUND) {
+                double elapsed = (DateTime.Now - LastSearch).TotalSeconds;
+                totalSecondsRemaining -= elapsed;
+                
+                if (LastSearchResult == FOUND) {
                     return solution;
                 }
-                if (t == NOT_FOUND) {
+                if (LastSearchResult == NOT_FOUND) {
                     return null;
                 }
-                if (t == CANCELED) {
+                if (LastSearchResult == CANCELED) {
                     return null;
                 }
-                if (t == TIMEDOUT)
+                if (LastSearchResult == TIMEDOUT)
                 {
+                    if (totalSecondsRemaining <= 0.5) {
+                        return null;
+                    }
+                }
+                if (LastSearchResult >= maxcost) {
+                    LastSearchResult = NOT_FOUND;
                     return null;
                 }
-                if (t >= maxcost) {
-                    return null;
-                }
-                solution.Bound = t;
+                
+                solution.Bound = LastSearchResult;
+                iteration++;
             }
         }
         

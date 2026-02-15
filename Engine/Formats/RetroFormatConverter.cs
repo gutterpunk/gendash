@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Xml.Linq;
 
-namespace GenDash.Engine
+namespace GenDash.Engine.Formats
 {
     /// <summary>
     /// Retro format converter for SGDK and older hardware compilers.

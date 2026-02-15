@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using GenDash.Engine;
 using GenDash.Models;
+using GenDash.Engine.Formats;
 
 namespace GenDash {
     class Fold {
@@ -16,6 +17,7 @@ namespace GenDash {
         public string MoveOrder { get; set; }
     }
     class BoardSolution(byte width, byte height, string data) : Board(width, height, data) {
+        public ulong Hash { get; set; }
         public List<Fold> Solution { get; set; }
         public int IdleFold { get; set; }
     }
@@ -102,93 +104,26 @@ namespace GenDash {
  
             SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
             
-            int seed = int.MaxValue;
-            int minMove = 15;
-            int minScore = 100;
-            int maxMove = 75;
-            int idleFold = 5; //NEVER CHANGE THAT!
-            int maxSolutionSeconds = 600;
-            int cpu = Environment.ProcessorCount - 1;
-            string xmlDatabase = "GenDashDB.xml";
-            string patternDatabase = null;
-            string format = "xml";
-            bool skipGeneration = false;
-            ulong playback = 0;
-            int playbackSpeed = 200;
+            // Parse command line options
+            CommandLineOptions options;
             try {
-                for (int i = 0; i < args.Length; i++) {
-                    if (args[i].Equals("-seed", StringComparison.OrdinalIgnoreCase)) {
-                        seed = int.Parse(args[++i]);
-                    } else
-                    if (args[i].Equals("-minmove", StringComparison.OrdinalIgnoreCase)) {
-                        minMove = int.Parse(args[++i]);
-                    } else
-                    if (args[i].Equals("-maxmove", StringComparison.OrdinalIgnoreCase)) {
-                        maxMove = int.Parse(args[++i]);
-                    } else
-                    if (args[i].Equals("-maxtime", StringComparison.OrdinalIgnoreCase))
-                    {
-                        maxSolutionSeconds = int.Parse(args[++i]);
-                    } else
-                    if (args[i].Equals("-idle", StringComparison.OrdinalIgnoreCase))
-                    {
-                        idleFold = int.Parse(args[++i]);
-                    } else
-                    if (args[i].Equals("-database", StringComparison.OrdinalIgnoreCase))
-                    {
-                        xmlDatabase = args[++i];
-                    } else
-                    if (args[i].Equals("-patterns", StringComparison.OrdinalIgnoreCase))
-                    {
-                        patternDatabase = args[++i];
-                    } else
-                    if (args[i].Equals("-tasks", StringComparison.OrdinalIgnoreCase))
-                    {
-                        cpu = int.Parse(args[++i]);
-                    } else
-                    if (args[i].Equals("-playback", StringComparison.OrdinalIgnoreCase))
-                    {
-                        playback = ulong.Parse(args[++i]);
-                    } else
-                    if (args[i].Equals("-playspeed", StringComparison.OrdinalIgnoreCase))
-                    {
-                        playbackSpeed = int.Parse(args[++i]);
-                    }
-                    else
-                    if (args[i].Equals("-minscore", StringComparison.OrdinalIgnoreCase))
-                    {
-                        minScore = int.Parse(args[++i]);
-                    }
-                    else
-                    if (args[i].Equals("-format", StringComparison.OrdinalIgnoreCase))
-                    {
-                        format = args[++i];
-                    }
-                    else
-                    if (args[i].Equals("-convert", StringComparison.OrdinalIgnoreCase))
-                    {
-                        format = args[++i];
-                        skipGeneration = true;
-                    }
-                }
+                options = CommandLineOptions.Parse(args);
             } catch (Exception e) {
                 Console.WriteLine(e.Message);
                 return;
-            }            
-            patternDatabase ??= xmlDatabase;
-            if (seed == int.MaxValue) seed = DateTime.Now.Millisecond;
+            }
             
             IFormatConverter converter;
             try {
-                converter = FormatConverterFactory.CreateConverter(format);
+                converter = FormatConverterFactory.CreateConverter(options.Format);
             } catch (ArgumentException ex) {
                 Console.WriteLine(ex.Message);
                 return;
             }
             
             var currentDirectory = Directory.GetCurrentDirectory();
-            var filepath = Path.Combine(currentDirectory, xmlDatabase);
-            var filepathWithoutExt = Path.Combine(currentDirectory, Path.GetFileNameWithoutExtension(xmlDatabase));
+            var filepath = Path.Combine(currentDirectory, options.XmlDatabase);
+            var filepathWithoutExt = Path.Combine(currentDirectory, Path.GetFileNameWithoutExtension(options.XmlDatabase));
 
             XElement puzzledb;
             XElement xmlPuzzledb = null;
@@ -237,7 +172,7 @@ namespace GenDash {
             {
                 puzzledb.Add(new XElement("Rejects"));
             }
-            if (skipGeneration)
+            if (options.SkipGeneration)
             {
                 converter.Save(puzzledb, filepathWithoutExt);
                 Console.WriteLine($"Database converted and saved to {Path.GetFileName(Path.ChangeExtension(filepathWithoutExt, converter.FileExtension))}");
@@ -246,14 +181,15 @@ namespace GenDash {
 
             HashSet<ulong> recordHashes = [.. from puzzle in puzzledb.Descendants("Board")
                 select (ulong)puzzle.Element("Hash")];
-            Console.WriteLine($"Boards loaded from {xmlDatabase} : {recordHashes.Count}");
+            Console.WriteLine($"Boards loaded from {options.XmlDatabase} : {recordHashes.Count}");
 
             Console.CursorVisible = false;
-            if (playback > 0) {
-                var toPlayback = (
+            if (options.Playback > 0) {
+                var allPlaybacks = (
                     from puzzle in puzzledb.Descendants("Board")  // Changed from boardsNode.Descendants("Board")
-                    where (ulong)puzzle.Element("Hash") == playback
+                    where options.Playback == ulong.MaxValue || (ulong)puzzle.Element("Hash") == options.Playback
                     select new BoardSolution((byte)(int)puzzle.Element("Width"), (byte)(int)puzzle.Element("Height"), (string)puzzle.Element("Data")) {
+                        Hash = (ulong)puzzle.Element("Hash"),
                         StartX = (int)puzzle.Element("StartX"),
                         StartY = (int)puzzle.Element("StartY"),
                         ExitX = (int)puzzle.Element("ExitX"),
@@ -265,37 +201,44 @@ namespace GenDash {
                                 Data = p.Value,
                                 MoveOrder = (string)p.Attribute("MoveOrder"),     
                             })]
-                    }).FirstOrDefault();
-                if (toPlayback != null) {
-                    Console.Clear();
-                    TrySetCursorPosition(0, 0);                    
-                    Console.Write("Engine");
-                    TrySetCursorPosition(toPlayback.ColCount + 3, 0);                    
-                    Console.Write("Stored");
-                    for (int i = 0; i < toPlayback.IdleFold; i ++) {
-                        toPlayback.Fold();
-                        TrySetCursorPosition(0, 1);                    
-                        toPlayback.Dump();
-                        Console.WriteLine($"Idle {toPlayback.IdleFold - i}".PadRight(40));
-                        Thread.Sleep(playbackSpeed);
-                    }
-                    toPlayback.Place(new Element(Element.Player), toPlayback.StartY, toPlayback.StartX);
-                    toPlayback.Solution.Remove(toPlayback.Solution.First());
-                    foreach (var s in toPlayback.Solution) {
-                        toPlayback.SetMove(s.Move);
-                        toPlayback.Fold();
-                        TrySetCursorPosition(0, 1);                    
-                        toPlayback.Dump();
-                        Console.WriteLine();
-                        for (int i = 0; i < s.Data.Length; i += toPlayback.ColCount) {
-                            TrySetCursorPosition(toPlayback.ColCount + 3, (i / toPlayback.ColCount) + 1);                    
-                            Console.Write(s.Data.Substring(i, toPlayback.ColCount));
+                    }).ToList();
+                if (allPlaybacks.Count > 0) {
+                    for (int j = 0; j < allPlaybacks.Count; j++) {
+                        var toPlayback = allPlaybacks[j];
+                        Console.Clear();
+                        TrySetCursorPosition(0, 0);                    
+                        Console.Write("Engine");
+                        TrySetCursorPosition(toPlayback.ColCount + 3, 0);                    
+                        Console.Write("Stored");
+                        for (int i = 0; i < toPlayback.IdleFold; i ++) {
+                            toPlayback.Fold();
+                            TrySetCursorPosition(0, 1);                    
+                            toPlayback.Dump();
+                            Console.WriteLine($"Idle {toPlayback.IdleFold - i}".PadRight(40));
+                            Console.WriteLine($"{j + 1}/{allPlaybacks.Count}");
+                            Console.WriteLine(toPlayback.Hash);                            
+                            Thread.Sleep(options.PlaybackSpeed);
                         }
-                        Console.WriteLine();
-                        Console.WriteLine();
-                        //Console.WriteLine(s.MoveOrder.PadRight(80));
-                        Console.WriteLine(s.Move.PadRight(40));
-                        Thread.Sleep(playbackSpeed);
+                        toPlayback.Place(new Element(Element.Player), toPlayback.StartY, toPlayback.StartX);
+                        toPlayback.Solution.Remove(toPlayback.Solution.First());
+                        foreach (var s in toPlayback.Solution) {
+                            toPlayback.SetMove(s.Move);
+                            toPlayback.Fold();
+                            TrySetCursorPosition(0, 1);                    
+                            toPlayback.Dump();
+                            Console.WriteLine();
+                            for (int i = 0; i < s.Data.Length; i += toPlayback.ColCount) {
+                                TrySetCursorPosition(toPlayback.ColCount + 3, (i / toPlayback.ColCount) + 1);                    
+                                Console.Write(s.Data.Substring(i, toPlayback.ColCount));
+                            }
+                            Console.WriteLine();
+                            Console.WriteLine();
+                            //Console.WriteLine(s.MoveOrder.PadRight(80));
+                            Console.WriteLine(s.Move.PadRight(40));
+                            Thread.Sleep(options.PlaybackSpeed);
+                        }
+                        Console.WriteLine("Playback complete. Press any key to continue...");
+                        Console.ReadKey(true);
                     }
                 }
                 return;
@@ -306,14 +249,14 @@ namespace GenDash {
                 select (ulong)puzzle.Element("Hash")
             );
             XElement patternsdb = puzzledb;
-            if (xmlDatabase != patternDatabase) {
-                var pfilepath = Path.Combine(currentDirectory, patternDatabase);
+            if (options.XmlDatabase != options.PatternDatabase) {
+                var pfilepath = Path.Combine(currentDirectory, options.PatternDatabase);
                 if (!File.Exists(pfilepath)) {
                     throw new FileNotFoundException(pfilepath);
                 }
                 patternsdb = XElement.Load(pfilepath);
             }
-            if (skipGeneration) {
+            if (options.SkipGeneration) {
                 converter.Save(puzzledb, filepathWithoutExt);
                 Console.WriteLine($"Database converted and saved to {Path.GetFileName(Path.ChangeExtension(filepathWithoutExt, converter.FileExtension))}");
                 return;
@@ -352,8 +295,8 @@ namespace GenDash {
                     )]
                 }
             )];
-            Console.WriteLine($"Patterns loaded from {patternDatabase} : {patterns.Count}");
-            Random rnd = new(seed);
+            Console.WriteLine($"Patterns loaded from {options.PatternDatabase} : {patterns.Count}");
+            Random rnd = new(options.Seed);
             Dictionary<Task, Worker> tasks = new();
             int cposx = 0;
             int cposy = Console.CursorTop + 1;
@@ -369,13 +312,13 @@ namespace GenDash {
             {
                 while (!Console.KeyAvailable)
                 {
-                    int count = Math.Max(0, cpu - tasks.Count);
+                    int count = Math.Max(0, options.Cpu - tasks.Count);
 
                     for (int i = 0; i < count; i++)
                     {
                         Worker worker = new();
                         int workerSeed = rnd.Next();
-                        Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, new Random(workerSeed), puzzledb, recordHashes, patterns, rejectHashes, saveQueue, minMove, maxMove, minScore, idleFold, maxSolutionSeconds),
+                        Task t = Task.Factory.StartNew(() => worker.Work(tasks.Count, new Random(workerSeed), puzzledb, recordHashes, patterns, rejectHashes, saveQueue, options.MinMove, options.MaxMove, options.MinScore, options.IdleFold, options.MaxSolutionSeconds),
                             source.Token);
                         tasks.Add(t, worker);
                     }

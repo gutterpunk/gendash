@@ -1,6 +1,6 @@
 using System;
 
-namespace GenDash.Engine
+namespace GenDash.Engine.Formats
 {
     /// <summary>
     /// Factory for creating format converters based on format name

@@ -12,12 +12,13 @@
             "program": "${workspaceFolder}/bin/Debug/net8.0/GenDash.exe",
             "args": [
                 "-patterns", "patterns.xml",
-                //"-playback","16727226690951275675",
-                //"-playspeed","800",
+                //"-playback",
+                //"-playback", "7502316539870460247",
+                //"-playspeed","500",
                 "-seed", "64",
                 "-minmove","20",
                 "-maxmove","50",
-                "-tasks","30",
+                "-tasks","20",
                 "-maxtime", "1000"
             ],
             "cwd": "${workspaceFolder}",

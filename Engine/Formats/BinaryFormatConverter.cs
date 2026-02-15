@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Xml.Linq;
 
-namespace GenDash.Engine
+namespace GenDash.Engine.Formats
 {
     /// <summary>
     /// Minimal binary format converter for puzzle database

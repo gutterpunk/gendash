@@ -1,6 +1,6 @@
 ﻿using System.Xml.Linq;
 
-namespace GenDash.Engine
+namespace GenDash.Engine.Formats
 {
     public interface IFormatConverter
     {

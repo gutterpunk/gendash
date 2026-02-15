@@ -1,7 +1,7 @@
 using System.IO;
 using System.Xml.Linq;
 
-namespace GenDash.Engine
+namespace GenDash.Engine.Formats
 {
     /// <summary>
     /// Default XML format converter (no conversion, just saves as XML)

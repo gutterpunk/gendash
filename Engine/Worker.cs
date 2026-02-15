@@ -74,7 +74,7 @@ namespace GenDash.Engine {
             board.Place(new Element(Element.Player), board.StartY, board.StartX);
 
             Phase = "Solving";
-            Solution s = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), maxMove, 1f);
+            Solution s = Solver.Solve(id, board, new TimeSpan(0, 0, maxSolutionSeconds), maxMove);
             
             if (s != null && s.Path.Count - 1 < minMove) {
                 Phase = "Rejected";
